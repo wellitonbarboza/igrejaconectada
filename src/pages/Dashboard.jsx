@@ -1,0 +1,298 @@
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { Users, Building2, GitBranch, TrendingUp, UserPlus, Cake } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export default function Dashboard() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadUser = async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        if (mounted) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar usuário');
+      }
+    };
+    loadUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const isAdmin = user?.role === 'admin';
+
+  const { data: membros = [] } = useQuery({
+    queryKey: ['membros'],
+    queryFn: () => base44.entities.Membro.list('-created_date'),
+    initialData: [],
+  });
+
+  const { data: congregacoes = [] } = useQuery({
+    queryKey: ['congregacoes'],
+    queryFn: () => base44.entities.Congregacao.list('-created_date'),
+    initialData: [],
+    enabled: isAdmin,
+  });
+
+  const { data: departamentos = [] } = useQuery({
+    queryKey: ['departamentos'],
+    queryFn: () => base44.entities.Departamento.list('-created_date'),
+    initialData: [],
+  });
+
+  const filteredMembros = isAdmin
+    ? membros
+    : membros.filter((m) => m.congregacao_id === user?.congregacao_id);
+
+  const membrosAtivos = filteredMembros.filter((m) => m.ativo);
+  const membrosPorTipo = {
+    membro: filteredMembros.filter((m) => m.tipo === 'membro').length,
+    congregado: filteredMembros.filter((m) => m.tipo === 'congregado').length,
+    visitante: filteredMembros.filter((m) => m.tipo === 'visitante').length,
+    crianca: filteredMembros.filter((m) => m.tipo === 'crianca').length,
+  };
+
+  const aniversariantesDoMes = filteredMembros
+    .filter((m) => {
+      if (!m.data_nascimento) return false;
+      const dataNasc = new Date(`${m.data_nascimento}T00:00:00`);
+      const hoje = new Date();
+      return dataNasc.getMonth() === hoje.getMonth();
+    })
+    .slice(0, 5);
+
+  const membrosRecentes = [...filteredMembros]
+    .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+    .slice(0, 5);
+
+  const stats = [
+    {
+      title: 'Total de Membros',
+      value: membrosAtivos.length,
+      icon: Users,
+      color: 'from-blue-500 to-blue-600',
+      trend: '+12% este mês',
+    },
+    ...(isAdmin
+      ? [
+          {
+            title: 'Congregações',
+            value: congregacoes.filter((c) => c.ativa).length,
+            icon: Building2,
+            color: 'from-purple-500 to-purple-600',
+            trend: `${congregacoes.length} total`,
+          },
+        ]
+      : []),
+    {
+      title: 'Departamentos',
+      value: departamentos.filter((d) => d.ativo).length,
+      icon: GitBranch,
+      color: 'from-green-500 to-green-600',
+      trend: 'Ativos',
+    },
+    {
+      title: 'Aniversariantes',
+      value: aniversariantesDoMes.length,
+      icon: Cake,
+      color: 'from-pink-500 to-pink-600',
+      trend: 'Este mês',
+    },
+  ];
+
+  return (
+    <div className="p-4 md:p-8 min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">
+              Bem-vindo de volta! 👋
+            </h1>
+            <p className="text-slate-500 mt-2">
+              Aqui está um resumo das atividades da sua {isAdmin ? 'igreja' : 'congregação'}
+            </p>
+          </div>
+          <Link to={`${createPageUrl('Membros')}?action=novo`}>
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Novo Membro
+            </Button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.map((stat, index) => (
+            <Card key={index} className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <div
+                className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.color} opacity-10 rounded-full transform translate-x-10 -translate-y-10`}
+              />
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">{stat.title}</p>
+                    <CardTitle className="text-3xl font-bold mt-2">{stat.value}</CardTitle>
+                  </div>
+                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
+                    <stat.icon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center text-sm">
+                  <TrendingUp className="w-4 h-4 mr-1 text-green-500" />
+                  <span className="text-slate-600">{stat.trend}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-6">
+          <Card className="shadow-lg border-0">
+            <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Cake className="w-5 h-5 text-pink-500" />
+                  Aniversariantes do Mês
+                </CardTitle>
+                <Link to={`${createPageUrl('Relatorios')}?tipo=aniversariantes`}>
+                  <Button variant="ghost" size="sm">
+                    Ver todos
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {aniversariantesDoMes.length > 0 ? (
+                <div className="space-y-4">
+                  {aniversariantesDoMes.map((membro) => (
+                    <div
+                      key={membro.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center">
+                          <span className="text-white font-semibold text-sm">
+                            {membro.nome_completo?.charAt(0)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
+                          {membro.data_nascimento && (
+                            <p className="text-sm text-slate-500">
+                              {format(new Date(`${membro.data_nascimento}T00:00:00`), "d 'de' MMMM", { locale: ptBR })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="bg-pink-100 text-pink-700">
+                        {membro.tipo}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Cake className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhum aniversariante este mês</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg border-0">
+            <CardHeader className="border-b bg-gradient-to-r from-green-50 to-blue-50">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-green-500" />
+                  Membros Recentes
+                </CardTitle>
+                <Link to={createPageUrl('Membros')}>
+                  <Button variant="ghost" size="sm">
+                    Ver todos
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {membrosRecentes.length > 0 ? (
+                <div className="space-y-4">
+                  {membrosRecentes.map((membro) => (
+                    <div
+                      key={membro.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white font-semibold text-sm">
+                            {membro.nome_completo?.charAt(0)}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
+                          {membro.created_date && (
+                            <p className="text-sm text-slate-500">
+                              Cadastrado em {format(new Date(membro.created_date), 'd/MM/yyyy')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          membro.tipo === 'membro'
+                            ? 'bg-blue-100 text-blue-700'
+                            : membro.tipo === 'congregado'
+                            ? 'bg-green-100 text-green-700'
+                            : membro.tipo === 'visitante'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-purple-100 text-purple-700'
+                        }
+                      >
+                        {membro.tipo}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhum membro cadastrado ainda</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="shadow-lg border-0">
+          <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
+            <CardTitle>Distribuição por Tipo</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(membrosPorTipo).map(([tipo, count]) => (
+                <div key={tipo} className="text-center p-4 bg-slate-50 rounded-lg">
+                  <p className="text-3xl font-bold text-slate-900">{count}</p>
+                  <p className="text-sm text-slate-500 capitalize mt-1">{`${tipo}s`}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

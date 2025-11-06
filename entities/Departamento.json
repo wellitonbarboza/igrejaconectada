@@ -1,0 +1,46 @@
+{
+  "name": "Departamento",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do departamento"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descrição das atividades"
+    },
+    "congregacao_id": {
+      "type": "string",
+      "description": "ID da congregação (vazio para departamentos globais)"
+    },
+    "congregacao_nome": {
+      "type": "string",
+      "description": "Nome da congregação"
+    },
+    "lider_id": {
+      "type": "string",
+      "description": "ID do membro líder"
+    },
+    "lider_nome": {
+      "type": "string",
+      "description": "Nome do líder"
+    },
+    "membros_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs dos membros do departamento"
+    },
+    "cor": {
+      "type": "string",
+      "description": "Cor para identificação visual",
+      "default": "#3b82f6"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o departamento está ativo"
+    }
+  },
+  "required": ["nome"]
+}
