@@ -1,0 +1,43 @@
+{
+  "name": "Congregacao",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da congregação"
+    },
+    "cidade": {
+      "type": "string",
+      "description": "Cidade onde a congregação está localizada"
+    },
+    "estado": {
+      "type": "string",
+      "description": "Estado"
+    },
+    "endereco": {
+      "type": "string",
+      "description": "Endereço completo"
+    },
+    "telefone": {
+      "type": "string",
+      "description": "Telefone de contato"
+    },
+    "pastor_responsavel": {
+      "type": "string",
+      "description": "Nome do pastor ou líder responsável"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email de contato"
+    },
+    "ativa": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se a congregação está ativa"
+    }
+  },
+  "required": [
+    "nome",
+    "cidade"
+  ]
+}

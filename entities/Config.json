@@ -1,0 +1,47 @@
+{
+  "name": "Config",
+  "type": "object",
+  "properties": {
+    "nome_igreja": {
+      "type": "string",
+      "description": "Nome oficial da igreja"
+    },
+    "endereco_completo": {
+      "type": "string",
+      "description": "Endereço completo da igreja"
+    },
+    "cidade": {
+      "type": "string",
+      "description": "Cidade"
+    },
+    "estado": {
+      "type": "string",
+      "description": "Estado"
+    },
+    "cep": {
+      "type": "string",
+      "description": "CEP"
+    },
+    "telefone": {
+      "type": "string",
+      "description": "Telefone"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL da logo da igreja"
+    },
+    "cnpj": {
+      "type": "string",
+      "description": "CNPJ da igreja"
+    },
+    "pastor_presidente": {
+      "type": "string",
+      "description": "Nome do pastor presidente"
+    }
+  },
+  "required": ["nome_igreja"]
+}
