@@ -40,36 +40,18 @@ import {
 } from '@/components/ui/table';
 import ModalMembro from '@/components/membros/ModalMembro.jsx';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function Membros() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [statusFiltro, setStatusFiltro] = useState('todos');
   const [congregacaoFiltro, setCongregacaoFiltro] = useState('todas');
   const [showModal, setShowModal] = useState(false);
   const [membroSelecionado, setMembroSelecionado] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        if (mounted) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar usuário');
-      }
-    };
-    loadUser();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Search, Download, Church, Calendar, Hash } from 'lucide-react';
@@ -7,30 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function Cartoes() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [membrosSelecionados, setMembrosSelecionados] = useState([]);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        if (mounted) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar usuário');
-      }
-    };
-    loadUser();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const isAdmin = user?.role === 'admin';
 

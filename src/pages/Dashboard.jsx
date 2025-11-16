@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -9,28 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        if (mounted) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar usuário');
-      }
-    };
-    loadUser();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { user } = useAuth();
 
   const isAdmin = user?.role === 'admin';
 

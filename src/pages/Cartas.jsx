@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Mail, Search, FileText, Download, UserCheck } from 'lucide-react';
@@ -16,33 +16,15 @@ import {
 } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function Cartas() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [tipoCarta, setTipoCarta] = useState('recomendacao');
   const [membroSelecionado, setMembroSelecionado] = useState(null);
   const [incluirFamilia, setIncluirFamilia] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        if (mounted) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar usuário');
-      }
-    };
-    loadUser();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const isAdmin = user?.role === 'admin';
 

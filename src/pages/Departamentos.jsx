@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GitBranch, Plus, Users, Edit, Trash2, MoreVertical } from 'lucide-react';
@@ -12,30 +12,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ModalDepartamento from '@/components/departamentos/ModalDepartamento.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function Departamentos() {
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [departamentoSelecionado, setDepartamentoSelecionado] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        if (mounted) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar usuário');
-      }
-    };
-    loadUser();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const isAdmin = user?.role === 'admin';
 
