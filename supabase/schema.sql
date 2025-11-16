@@ -9,6 +9,25 @@ create table if not exists public.profiles (
   created_at timestamp with time zone default now()
 );
 
+-- Função auxiliar para verificar privilégios de administrador sem acionar
+-- recursão nas políticas da própria tabela de perfis.
+create or replace function public.is_admin(user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = user_id
+      and role = 'admin'
+  );
+$$;
+
+grant execute on function public.is_admin(uuid) to public;
+
 create table if not exists public.congregacoes (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
@@ -104,10 +123,9 @@ create policy "Criar próprio perfil" on public.profiles
   for insert with check (auth.uid() = id);
 
 create policy "Administradores podem tudo" on public.profiles
-  for all using (exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  ));
+  for all
+  using (public.is_admin(auth.uid()))
+  with check (public.is_admin(auth.uid()));
 
 create policy "Leitura geral" on public.membros
   for select using (auth.role() = 'authenticated');
