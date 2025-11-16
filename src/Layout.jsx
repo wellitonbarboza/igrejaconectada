@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/context/AuthContext.jsx';
 import {
   LayoutDashboard,
   Users,
@@ -33,27 +33,7 @@ import { Button } from '@/components/ui/button';
 
 export default function Layout({ children }) {
   const location = useLocation();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        if (isMounted) {
-          setUser(currentUser);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar usuário:', error);
-      }
-    };
-    loadUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { user, signOut } = useAuth();
 
   const isAdmin = user?.role === 'admin';
 
@@ -79,6 +59,11 @@ export default function Layout({ children }) {
             title: 'Congregações',
             url: createPageUrl('Congregacoes'),
             icon: Building2,
+          },
+          {
+            title: 'Usuários',
+            url: createPageUrl('Usuarios'),
+            icon: Users,
           },
         ]
       : []),
@@ -110,8 +95,8 @@ export default function Layout({ children }) {
 
   const handleLogout = async () => {
     try {
-      await base44.auth.logout();
-      window.location.href = '/';
+      await signOut();
+      window.location.href = '/entrar';
     } catch (error) {
       console.error('Erro ao sair:', error);
     }

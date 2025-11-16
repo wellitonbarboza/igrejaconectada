@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import Layout from './Layout.jsx';
 import Dashboard from '@/pages/Dashboard.jsx';
 import Membros from '@/pages/Membros.jsx';
@@ -10,12 +10,39 @@ import Relatorios from '@/pages/Relatorios.jsx';
 import Cartoes from '@/pages/Cartoes.jsx';
 import Configuracoes from '@/pages/Configuracoes.jsx';
 import Cartas from '@/pages/Cartas.jsx';
+import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
 import { createPageUrl } from '@/utils';
+import AuthPage from '@/pages/Auth.jsx';
+import { useAuth } from '@/context/AuthContext.jsx';
+
+function ProtectedShell() {
+  const location = useLocation();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/entrar" state={{ from: location }} replace />;
+  }
+
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
+}
 
 export default function App() {
   return (
-    <Layout>
-      <Routes>
+    <Routes>
+      <Route path="/entrar" element={<AuthPage />} />
+      <Route element={<ProtectedShell />}>
         <Route index element={<Navigate to={createPageUrl('Dashboard')} replace />} />
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
         <Route path={createPageUrl('Membros')} element={<Membros />} />
@@ -26,8 +53,9 @@ export default function App() {
         <Route path={createPageUrl('Cartoes')} element={<Cartoes />} />
         <Route path={createPageUrl('Configuracoes')} element={<Configuracoes />} />
         <Route path={createPageUrl('Cartas')} element={<Cartas />} />
+        <Route path={createPageUrl('Usuarios')} element={<UsuariosAdmin />} />
         <Route path="*" element={<Navigate to={createPageUrl('Dashboard')} replace />} />
-      </Routes>
-    </Layout>
+      </Route>
+    </Routes>
   );
 }

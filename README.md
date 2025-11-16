@@ -1,6 +1,6 @@
 # Igreja Conectada
 
-Aplicação web para gestão de igrejas com módulos de membros, congregações, departamentos, relatórios, cartas e cartões.
+Aplicação web para gestão de igrejas com módulos de membros, congregações, departamentos, relatórios, cartas e cartões integrada ao Supabase para autenticação, banco de dados e armazenamento de arquivos.
 
 ## Tecnologias
 
@@ -37,14 +37,33 @@ npm run build
 
 ## Estrutura principal
 
-- `src/api` – clientes de API (Base44)
+- `src/api` – cliente para Supabase (autenticação, tabelas e storage)
 - `src/pages` – páginas principais da aplicação
 - `src/components` – componentes reutilizáveis (ui e modais)
 - `entities` – definições dos modelos utilizados pelo backend
 
 ## Variáveis de ambiente
 
-- `VITE_BASE44_API_URL`: URL base do backend Base44 (opcional, padrão `/api`).
+- `VITE_SUPABASE_URL`: URL do projeto no Supabase (ex.: `https://xxxxx.supabase.co`)
+- `VITE_SUPABASE_ANON_KEY`: chave pública `anon` gerada pelo Supabase
+- `VITE_SUPABASE_STORAGE_BUCKET` (opcional): nome do bucket público usado para uploads (padrão `documentos`)
+
+Crie um arquivo `.env` na raiz seguindo o exemplo:
+
+```
+VITE_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=chave-publica
+VITE_SUPABASE_STORAGE_BUCKET=documentos
+```
+
+## Configuração do Supabase
+
+1. Importe o script `supabase/schema.sql` no painel SQL do Supabase para criar tabelas, políticas e buckets necessários.
+2. Ative o modo "auto confirm" para cadastros de usuários em **Authentication → Providers → Email** para que novos cadastros recebam sessão imediatamente.
+3. Em **Storage**, confirme que existe um bucket público com o mesmo nome definido na variável `VITE_SUPABASE_STORAGE_BUCKET` (por padrão, `documentos`).
+4. Para administrar usuários pela aplicação, utilize perfis com `role = 'admin'`. O primeiro usuário pode ser promovido diretamente no painel SQL atualizando a coluna `role` da tabela `profiles`.
+
+> Observação: a exclusão de usuários na tela administrativa remove apenas o registro em `profiles`. Remoções definitivas do usuário (auth.users) devem ser feitas pelo painel do Supabase utilizando uma `service_role` key.
 
 ## Licença
 
