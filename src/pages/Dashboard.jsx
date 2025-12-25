@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -10,11 +10,45 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
+import ieadLogo from '@/assets/iead-logo.svg';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const isAdmin = user?.role === 'admin';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const updateInstalledState = () => {
+      setIsInstalled(mediaQuery.matches || window.navigator.standalone === true);
+    };
+
+    updateInstalledState();
+
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      setIsInstalled(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    mediaQuery.addEventListener('change', updateInstalledState);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      mediaQuery.removeEventListener('change', updateInstalledState);
+    };
+  }, []);
 
   const { data: membros = [] } = useQuery({
     queryKey: ['membros'],
@@ -61,6 +95,14 @@ export default function Dashboard() {
     .slice(0, 5);
 
   const downloadBaseUrl = createPageUrl('Download');
+  const canInstall = Boolean(installPrompt) && !isInstalled;
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
 
   const stats = [
     {
@@ -171,7 +213,21 @@ export default function Dashboard() {
                   Baixar para desktop
                 </Button>
               </Link>
+              {canInstall && (
+                <Button
+                  variant="outline"
+                  className="border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:border-indigo-300"
+                  onClick={handleInstallClick}
+                  type="button"
+                >
+                  <img src={ieadLogo} alt="Logo IEAD" className="w-4 h-4 mr-2" />
+                  Instalar como app
+                </Button>
+              )}
             </div>
+            {isInstalled && (
+              <p className="text-sm text-slate-500">Este app já está instalado neste dispositivo.</p>
+            )}
           </CardContent>
         </Card>
 
