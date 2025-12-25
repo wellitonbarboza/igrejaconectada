@@ -49,12 +49,6 @@ export default function UsuariosAdmin() {
     }
   };
 
-  const handleCreateUser = () => {
-    if (typeof window !== 'undefined') {
-      window.open('/entrar', '_blank', 'noopener');
-    }
-  };
-
   if (user?.role !== 'admin') {
     return <Navigate to={createPageUrl('Dashboard')} replace />;
   }
@@ -93,9 +87,9 @@ export default function UsuariosAdmin() {
               Gerencie quem pode acessar o painel e defina os níveis de permissão da sua equipe.
             </p>
           </div>
-          <Button onClick={handleCreateUser} className="bg-gradient-to-r from-blue-500 to-purple-600">
+          <Button disabled className="bg-gradient-to-r from-blue-500 to-purple-600">
             <UserPlus className="w-4 h-4 mr-2" />
-            Novo cadastro
+            Cadastro desativado
           </Button>
         </div>
 

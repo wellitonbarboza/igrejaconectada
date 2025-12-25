@@ -2,6 +2,15 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'documentos';
 const SESSION_KEY = 'igreja-conectada.profile.session';
+const ADMIN_DEFAULT_PASSWORD = '123456';
+const ADMIN_PROFILE = {
+  id: 'admin-geral',
+  full_name: 'Administrador Geral',
+  email: 'admin@igreja.local',
+  role: 'admin',
+  access_token: 'admin-session',
+  expires_in: 60 * 60 * 24 * 30,
+};
 
 function assertSupabaseEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -143,62 +152,19 @@ export const base44 = {
     async me() {
       return getCurrentUser();
     },
-    async login({ email, password }) {
-      assertSupabaseEnv();
-      const query = `?select=id,full_name,email,role,password_hash&email=eq.${encodeURIComponent(
-        email
-      )}`;
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles${query}`, {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || 'Não foi possível entrar. Verifique suas credenciais.');
+    async login({ password }) {
+      if (password !== ADMIN_DEFAULT_PASSWORD) {
+        throw new Error('Senha de administrador inválida.');
       }
-
-      const data = await response.json();
-      const profile = Array.isArray(data) ? data[0] : data;
-      if (!profile?.id || profile.password_hash !== password) {
-        throw new Error('Usuário ou senha inválidos.');
+      const stored = storeSession(ADMIN_PROFILE);
+      if (!stored) {
+        throw new Error('Não foi possível iniciar a sessão do administrador.');
       }
-      const { password_hash, ...safeProfile } = profile;
-      storeSession(safeProfile);
+      const { access_token, expires_in, expires_at, ...safeProfile } = stored;
       return safeProfile;
     },
     async register({ email, password, full_name, role }) {
-      assertSupabaseEnv();
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation',
-        },
-        body: JSON.stringify({
-          email,
-          password_hash: password,
-          full_name,
-          role,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || 'Erro ao criar conta');
-      }
-
-      const data = await response.json();
-      const profile = Array.isArray(data) ? data[0] : data;
-      if (!profile?.id) {
-        return null;
-      }
-      const { password_hash, ...safeProfile } = profile;
-      storeSession(safeProfile);
-      return safeProfile;
+      throw new Error('Cadastro de usuários desativado.');
     },
     async logout() {
       storeSession(null);
