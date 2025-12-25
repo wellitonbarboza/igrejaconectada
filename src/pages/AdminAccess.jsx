@@ -46,7 +46,6 @@ export default function AdminAccess() {
           </div>
           <div className="space-y-2">
             <p className="text-sm uppercase text-white/60 tracking-widest">Credencial padrão</p>
-            <p className="text-white text-lg font-semibold">Senha 123456</p>
           </div>
         </div>
 
