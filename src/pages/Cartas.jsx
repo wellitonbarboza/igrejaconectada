@@ -17,6 +17,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
+import churchLogo from '@/assets/church-logo.svg';
 
 export default function Cartas() {
   const { user } = useAuth();
@@ -62,7 +63,11 @@ export default function Cartas() {
     return (
       <div className="bg-white p-12 max-w-4xl mx-auto shadow-2xl print:shadow-none" style={{ minHeight: '297mm' }}>
         <div className="text-center mb-12 pb-6 border-b-2 border-blue-600">
-          {config.logo_url && <img src={config.logo_url} alt="Logo" className="h-24 mx-auto mb-4" />}
+          <img
+            src={config.logo_url || churchLogo}
+            alt="Logo"
+            className="h-24 mx-auto mb-4"
+          />
           <h1 className="text-2xl font-bold text-slate-900 mb-2">{config.nome_igreja}</h1>
           <div className="text-sm text-slate-600 space-y-1">
             {config.endereco_completo && <p>{config.endereco_completo}</p>}
@@ -194,7 +199,7 @@ export default function Cartas() {
           {showPreview && (
             <Button onClick={handleImprimir} className="bg-gradient-to-r from-blue-500 to-purple-600">
               <Download className="w-4 h-4 mr-2" />
-              Imprimir Carta
+              Baixar Carta
             </Button>
           )}
         </div>
