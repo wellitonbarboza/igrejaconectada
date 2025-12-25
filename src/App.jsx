@@ -12,7 +12,6 @@ import Configuracoes from '@/pages/Configuracoes.jsx';
 import Cartas from '@/pages/Cartas.jsx';
 import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
 import { createPageUrl } from '@/utils';
-import AdminAccess from '@/pages/AdminAccess.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 
 function ProtectedShell() {
@@ -27,7 +26,14 @@ function ProtectedShell() {
   }
 
   if (!user) {
-    return <AdminAccess />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="text-center space-y-2">
+          <p className="text-slate-600">Carregando acesso administrativo...</p>
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    );
   }
 
   return (
