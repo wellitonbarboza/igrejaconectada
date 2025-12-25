@@ -30,30 +30,43 @@ function getAdminApiKey() {
   return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 }
 
-async function fetchAuthAdminUser(id) {
-  assertSupabaseEnv();
-  const authToken = getAdminAuthToken();
-  const apiKey = getAdminApiKey();
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
-    headers: {
-      apikey: apiKey,
-      Authorization: `Bearer ${authToken}`,
-    },
-  });
+function getFileExtensionFromType(type) {
+  if (type === 'image/webp') return 'webp';
+  if (type === 'image/png') return 'png';
+  if (type === 'image/jpeg') return 'jpg';
+  return 'bin';
+}
 
-  if (response.status === 404) {
-    return null;
+function stripFileExtension(fileName = '') {
+  return fileName.replace(/\.[^/.]+$/, '') || 'arquivo';
+}
+
+async function compressImageFile(file) {
+  if (!file?.type?.startsWith('image/')) {
+    return file;
   }
 
-  if (!response.ok) {
-    const text = await response.text();
-    if (response.status === 401) {
-      throw new Error(buildUnauthorizedMessage(text));
-    }
-    throw new Error(text || 'Erro ao consultar usuário administrador');
-  }
+  const bitmap = await createImageBitmap(file);
+  const maxSize = 1600;
+  const scale = Math.min(1, maxSize / bitmap.width, maxSize / bitmap.height);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
 
-  return response.json();
+  ctx.drawImage(bitmap, 0, 0, width, height);
+
+  const outputType = file.type === 'image/png' ? 'image/webp' : file.type || 'image/jpeg';
+  const quality = 0.8;
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, outputType, quality));
+  if (!blob) return file;
+
+  const extension = getFileExtensionFromType(outputType);
+  const baseName = stripFileExtension(file.name);
+  return new File([blob], `${baseName}.${extension}`, { type: outputType });
 }
 
 function buildUnauthorizedMessage(details) {
@@ -154,10 +167,6 @@ async function ensureAdminProfile() {
   if (!SUPABASE_SERVICE_ROLE_KEY) {
     return { ...ADMIN_PROFILE };
   }
-  const adminUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
-  if (!adminUser) {
-    return { ...ADMIN_PROFILE };
-  }
   const payload = {
     id: ADMIN_PROFILE.id,
     full_name: ADMIN_PROFILE.full_name,
@@ -209,16 +218,17 @@ export const base44 = {
         }
         const authToken = getAdminAuthToken();
         const apiKey = getAdminApiKey();
-        const extension = file.name?.split('.').pop() || 'bin';
+        const optimizedFile = await compressImageFile(file);
+        const extension = optimizedFile.name?.split('.').pop() || 'bin';
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
+        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(bucket)}/${fileName}`, {
           method: 'POST',
           headers: {
             apikey: apiKey,
             Authorization: `Bearer ${authToken}`,
-            'Content-Type': file.type || 'application/octet-stream',
+            'Content-Type': optimizedFile.type || 'application/octet-stream',
           },
-          body: file,
+          body: optimizedFile,
         });
 
         if (!response.ok) {
