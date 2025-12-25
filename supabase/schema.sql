@@ -17,7 +17,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select exists (
     select 1
@@ -37,7 +37,7 @@ returns table (
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   return query
@@ -62,7 +62,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   return query
