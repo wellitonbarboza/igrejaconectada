@@ -11,6 +11,7 @@ import Cartoes from '@/pages/Cartoes.jsx';
 import Configuracoes from '@/pages/Configuracoes.jsx';
 import Cartas from '@/pages/Cartas.jsx';
 import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
+import Download from '@/pages/Download.jsx';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/context/AuthContext.jsx';
 
@@ -58,6 +59,8 @@ export default function App() {
         <Route path={createPageUrl('Configuracoes')} element={<Configuracoes />} />
         <Route path={createPageUrl('Cartas')} element={<Cartas />} />
         <Route path={createPageUrl('Usuarios')} element={<UsuariosAdmin />} />
+        <Route path={createPageUrl('Download')} element={<Navigate to={`${createPageUrl('Download')}/mobile`} replace />} />
+        <Route path={`${createPageUrl('Download')}/:platform`} element={<Download />} />
         <Route path="*" element={<Navigate to={createPageUrl('Dashboard')} replace />} />
       </Route>
     </Routes>

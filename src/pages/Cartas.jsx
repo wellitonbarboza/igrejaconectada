@@ -17,7 +17,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
-import churchLogo from '@/assets/church-logo.svg';
+import ieadLogo from '@/assets/iead-logo.svg';
 
 export default function Cartas() {
   const { user } = useAuth();
@@ -64,7 +64,7 @@ export default function Cartas() {
       <div className="bg-white p-12 max-w-4xl mx-auto shadow-2xl print:shadow-none" style={{ minHeight: '297mm' }}>
         <div className="text-center mb-12 pb-6 border-b-2 border-blue-600">
           <img
-            src={config.logo_url || churchLogo}
+            src={config.logo_url || ieadLogo}
             alt="Logo"
             className="h-24 mx-auto mb-4"
           />

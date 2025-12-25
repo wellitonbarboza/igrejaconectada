@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import ieadLogo from '@/assets/iead-logo.svg';
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
@@ -97,6 +98,8 @@ export default function Configuracoes() {
     }
     setUploading(false);
   };
+
+  const previewLogo = formData.logo_url || ieadLogo;
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
@@ -220,11 +223,9 @@ export default function Configuracoes() {
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-4">
-                {formData.logo_url && (
-                  <div className="flex justify-center">
-                    <img src={formData.logo_url} alt="Logo da Igreja" className="max-h-48 rounded-lg shadow-md" />
-                  </div>
-                )}
+                <div className="flex justify-center">
+                  <img src={previewLogo} alt="Logo da Igreja" className="max-h-48 rounded-lg shadow-md" />
+                </div>
 
                 <div>
                   <Label htmlFor="logo">Upload da Logo</Label>
