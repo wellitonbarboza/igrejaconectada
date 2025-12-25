@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './Layout.jsx';
 import Dashboard from '@/pages/Dashboard.jsx';
 import Membros from '@/pages/Membros.jsx';
@@ -12,11 +12,10 @@ import Configuracoes from '@/pages/Configuracoes.jsx';
 import Cartas from '@/pages/Cartas.jsx';
 import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
 import { createPageUrl } from '@/utils';
-import AuthPage from '@/pages/Auth.jsx';
+import AdminAccess from '@/pages/AdminAccess.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 
 function ProtectedShell() {
-  const location = useLocation();
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -28,7 +27,7 @@ function ProtectedShell() {
   }
 
   if (!user) {
-    return <Navigate to="/entrar" state={{ from: location }} replace />;
+    return <AdminAccess />;
   }
 
   return (
@@ -41,7 +40,6 @@ function ProtectedShell() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/entrar" element={<AuthPage />} />
       <Route element={<ProtectedShell />}>
         <Route index element={<Navigate to={createPageUrl('Dashboard')} replace />} />
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />

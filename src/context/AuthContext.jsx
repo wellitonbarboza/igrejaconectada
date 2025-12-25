@@ -40,8 +40,8 @@ export function AuthProvider({ children }) {
     };
   }, [refresh]);
 
-  const signIn = useCallback(async (credentials) => {
-    const loggedUser = await base44.auth.login(credentials);
+  const signIn = useCallback(async ({ password }) => {
+    const loggedUser = await base44.auth.login({ password });
     setUser(loggedUser);
     return loggedUser;
   }, []);

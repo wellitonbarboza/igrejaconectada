@@ -96,7 +96,7 @@ export default function Layout({ children }) {
   const handleLogout = async () => {
     try {
       await signOut();
-      window.location.href = '/entrar';
+      window.location.href = '/';
     } catch (error) {
       console.error('Erro ao sair:', error);
     }
