@@ -79,6 +79,12 @@ export default function ModalMembro({
         }
       : defaultFormData
   );
+  const updateFormData = (updater) => {
+    setFormData((prev) => {
+      const nextValue = typeof updater === 'function' ? updater(prev) : updater;
+      return nextValue ?? prev;
+    });
+  };
 
   const { data: departamentos = [] } = useQuery({
     queryKey: ['departamentos'],
@@ -189,7 +195,7 @@ export default function ModalMembro({
       nextValue = null;
     }
 
-    setFormData((prev) => {
+    updateFormData((prev) => {
       const updated = { ...prev, [field]: nextValue };
       if (field === 'origem' && nextValue === 'transferencia_envia') {
         updated.status = 'transferido';
@@ -232,7 +238,7 @@ export default function ModalMembro({
         .join(' ')
         .trim();
       if (transcript) {
-        setFormData((prev) => ({
+        updateFormData((prev) => ({
           ...prev,
           [field]: prev[field] ? `${prev[field].trim()} ${transcript}` : transcript,
         }));
@@ -259,7 +265,7 @@ export default function ModalMembro({
 
     const hasAnyLocal = formData.cidade || formData.estado || formData.cep;
     if (!hasAnyLocal) {
-      setFormData((prev) => ({
+      updateFormData((prev) => ({
         ...prev,
         cidade: config.cidade || prev.cidade,
         estado: config.estado || prev.estado,
@@ -276,7 +282,7 @@ export default function ModalMembro({
     if (!storedDraft) return;
     try {
       const parsedDraft = JSON.parse(storedDraft);
-      setFormData((prev) => ({ ...prev, ...parsedDraft }));
+      updateFormData((prev) => ({ ...prev, ...parsedDraft }));
     } catch (error) {
       console.warn('Não foi possível carregar o rascunho do membro.', error);
     }
@@ -294,7 +300,7 @@ export default function ModalMembro({
 
   useEffect(() => {
     if (formData.origem === 'transferencia_envia' && formData.status !== 'transferido') {
-      setFormData((prev) => ({ ...prev, status: 'transferido' }));
+      updateFormData((prev) => ({ ...prev, status: 'transferido' }));
     }
   }, [formData.origem, formData.status]);
 
@@ -317,7 +323,7 @@ export default function ModalMembro({
           return;
         }
 
-        setFormData((prev) => ({
+        updateFormData((prev) => ({
           ...prev,
           endereco: data.logradouro || prev.endereco,
           bairro: data.bairro || prev.bairro,
