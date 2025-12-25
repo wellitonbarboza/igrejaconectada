@@ -28,40 +28,55 @@ export default function ModalMembro({
   userCongregacaoId,
   isAdmin,
 }) {
+  const DRAFT_KEY = 'draft_membro';
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
   const didPrefillRef = useRef(false);
-  const [formData, setFormData] = useState(
-    membro || {
-      nome_completo: '',
-      tipo: 'congregado',
-      origem: 'novo',
-      status: 'ativo',
-      congregacao_id: isAdmin ? '' : userCongregacaoId,
-      data_nascimento: '',
-      sexo: '',
-      estado_civil: '',
-      telefone: '',
-      email: '',
-      endereco: '',
-      cidade: '',
-      estado: '',
-      cep: '',
-      data_batismo: '',
-      local_batismo: '',
-      batismo_espirito_santo: false,
-      data_batismo_espirito_santo: '',
-      obreiro: false,
-      cargo_obreiro: '',
-      departamento_id: null,
-      foto_url: '',
-      observacoes: '',
-      bairro: '',
-      ativo: true,
-    }
+  const normalizeOrigem = (origemValue) => {
+    if (origemValue === 'transferencia') return 'transferencia_recebe';
+    return origemValue;
+  };
+  const defaultFormData = {
+    nome_completo: '',
+    tipo: 'congregado',
+    origem: 'novo',
+    status: 'ativo',
+    congregacao_id: isAdmin ? '' : userCongregacaoId,
+    data_nascimento: '',
+    sexo: '',
+    estado_civil: '',
+    telefone: '',
+    email: '',
+    endereco: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    data_batismo: '',
+    local_batismo: '',
+    batismo_espirito_santo: false,
+    data_batismo_espirito_santo: '',
+    obreiro: false,
+    cargo_obreiro: '',
+    departamento_id: null,
+    foto_url: '',
+    observacoes: '',
+    bairro: '',
+    cidade_origem: '',
+    cidade_destino: '',
+    ativo: true,
+  };
+  const [formData, setFormData] = useState(() =>
+    membro
+      ? {
+          ...defaultFormData,
+          ...membro,
+          origem: normalizeOrigem(membro.origem || defaultFormData.origem),
+          status: membro.status || defaultFormData.status,
+        }
+      : defaultFormData
   );
 
   const { data: departamentos = [] } = useQuery({
@@ -130,6 +145,9 @@ export default function ModalMembro({
       return base44.entities.Membro.create(dataToSave);
     },
     onSuccess: () => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(DRAFT_KEY);
+      }
       queryClient.invalidateQueries({ queryKey: ['membros'] });
       onClose();
     },
@@ -166,7 +184,18 @@ export default function ModalMembro({
       nextValue = null;
     }
 
-    setFormData((prev) => ({ ...prev, [field]: nextValue }));
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: nextValue };
+      if (field === 'origem' && nextValue === 'transferencia_envia') {
+        updated.status = 'transferido';
+      }
+      return updated;
+    });
+  };
+
+  const handleSaveDraft = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
   };
 
   const speechSupported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -236,6 +265,35 @@ export default function ModalMembro({
   }, [config, formData.cidade, formData.estado, formData.cep, membro]);
 
   useEffect(() => {
+    if (membro) return;
+    if (typeof window === 'undefined') return;
+    const storedDraft = window.localStorage.getItem(DRAFT_KEY);
+    if (!storedDraft) return;
+    try {
+      const parsedDraft = JSON.parse(storedDraft);
+      setFormData((prev) => ({ ...prev, ...parsedDraft }));
+    } catch (error) {
+      console.warn('Não foi possível carregar o rascunho do membro.', error);
+    }
+  }, [membro]);
+
+  useEffect(() => {
+    if (membro) return;
+    if (typeof window === 'undefined') return;
+    const timeout = setTimeout(() => {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [formData, membro]);
+
+  useEffect(() => {
+    if (formData.origem === 'transferencia_envia' && formData.status !== 'transferido') {
+      setFormData((prev) => ({ ...prev, status: 'transferido' }));
+    }
+  }, [formData.origem, formData.status]);
+
+  useEffect(() => {
     const cepDigits = (formData.cep || '').replace(/\D/g, '');
     if (cepDigits.length !== 8) {
       setCepStatus({ loading: false, error: '' });
@@ -281,14 +339,14 @@ export default function ModalMembro({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {membro ? 'Editar Membro' : 'Novo Membro'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label>Foto do Membro</Label>
@@ -372,10 +430,36 @@ export default function ModalMembro({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="novo">Novo Convertido</SelectItem>
-                  <SelectItem value="transferencia">Transferência</SelectItem>
+                  <SelectItem value="membro_antigo">Membro (Antigo)</SelectItem>
+                  <SelectItem value="transferencia_recebe">Transferência (Recebe)</SelectItem>
+                  <SelectItem value="transferencia_envia">Transferência (Envia)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.origem === 'transferencia_recebe' && (
+              <div>
+                <Label htmlFor="cidade_origem">Cidade Origem</Label>
+                <Input
+                  id="cidade_origem"
+                  value={formData.cidade_origem}
+                  onChange={(e) => handleChange('cidade_origem', e.target.value)}
+                  placeholder="Cidade de origem"
+                />
+              </div>
+            )}
+
+            {formData.origem === 'transferencia_envia' && (
+              <div>
+                <Label htmlFor="cidade_destino">Cidade Destino</Label>
+                <Input
+                  id="cidade_destino"
+                  value={formData.cidade_destino}
+                  onChange={(e) => handleChange('cidade_destino', e.target.value)}
+                  placeholder="Cidade de destino"
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="status">Status *</Label>
@@ -738,6 +822,9 @@ export default function ModalMembro({
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
+            </Button>
+            <Button type="button" variant="outline" onClick={handleSaveDraft}>
+              Rascunho
             </Button>
             <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
               {saveMutation.isPending ? 'Salvando...' : 'Salvar'}

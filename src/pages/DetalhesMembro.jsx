@@ -120,7 +120,13 @@ export default function DetalhesMembro() {
                   </Badge>
                   {membro.origem && (
                     <Badge className="bg-slate-100 text-slate-700 border-slate-200">
-                      {membro.origem === 'novo' ? 'Novo Convertido' : 'Transferência'}
+                      {membro.origem === 'novo'
+                        ? 'Novo Convertido'
+                        : membro.origem === 'membro_antigo'
+                        ? 'Membro (Antigo)'
+                        : membro.origem === 'transferencia_envia'
+                        ? 'Transferência (Envia)'
+                        : 'Transferência (Recebe)'}
                     </Badge>
                   )}
                   {membro.obreiro && (

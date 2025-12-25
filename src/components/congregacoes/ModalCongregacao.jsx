@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -7,18 +7,20 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function ModalCongregacao({ congregacao, onClose }) {
+  const DRAFT_KEY = 'draft_congregacao';
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState(
-    congregacao || {
-      nome: '',
-      cidade: '',
-      estado: '',
-      endereco: '',
-      telefone: '',
-      email: '',
-      pastor_responsavel: '',
-      ativa: true,
-    }
+  const defaultFormData = {
+    nome: '',
+    cidade: '',
+    estado: '',
+    endereco: '',
+    telefone: '',
+    email: '',
+    pastor_responsavel: '',
+    ativa: true,
+  };
+  const [formData, setFormData] = useState(() =>
+    congregacao ? { ...defaultFormData, ...congregacao } : defaultFormData
   );
 
   const normalizeCongregacaoPayload = (data) => {
@@ -43,6 +45,9 @@ export default function ModalCongregacao({ congregacao, onClose }) {
       return base44.entities.Congregacao.create(normalizedData);
     },
     onSuccess: () => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(DRAFT_KEY);
+      }
       queryClient.invalidateQueries({ queryKey: ['congregacoes'] });
       onClose();
     },
@@ -57,16 +62,44 @@ export default function ModalCongregacao({ congregacao, onClose }) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleSaveDraft = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+  };
+
+  useEffect(() => {
+    if (congregacao) return;
+    if (typeof window === 'undefined') return;
+    const storedDraft = window.localStorage.getItem(DRAFT_KEY);
+    if (!storedDraft) return;
+    try {
+      const parsedDraft = JSON.parse(storedDraft);
+      setFormData((prev) => ({ ...prev, ...parsedDraft }));
+    } catch (error) {
+      console.warn('Não foi possível carregar o rascunho da congregação.', error);
+    }
+  }, [congregacao]);
+
+  useEffect(() => {
+    if (congregacao) return;
+    if (typeof window === 'undefined') return;
+    const timeout = setTimeout(() => {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [formData, congregacao]);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {congregacao ? 'Editar Congregação' : 'Nova Congregação'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label htmlFor="nome">Nome da Congregação *</Label>
@@ -133,6 +166,9 @@ export default function ModalCongregacao({ congregacao, onClose }) {
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
+            </Button>
+            <Button type="button" variant="outline" onClick={handleSaveDraft}>
+              Rascunho
             </Button>
             <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
               {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
