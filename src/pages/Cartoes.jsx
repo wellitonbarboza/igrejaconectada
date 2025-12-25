@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, Search, Download, Church, Calendar, Hash } from 'lucide-react';
+import { CreditCard, Search, Download, Calendar, Hash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
+import churchLogo from '@/assets/church-logo.svg';
 
 export default function Cartoes() {
   const { user } = useAuth();
@@ -47,7 +48,7 @@ export default function Cartoes() {
 
       <div className="relative z-10 h-full flex flex-col">
         <div className="flex items-center gap-2 mb-4">
-          <Church className="w-6 h-6" />
+          <img src={churchLogo} alt="Ícone da Igreja Digital" className="w-6 h-6" />
           <div>
             <p className="font-bold text-lg">Igreja Digital</p>
             <p className="text-xs opacity-80">Cartão de Membro</p>
@@ -99,7 +100,7 @@ export default function Cartoes() {
             className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
           >
             <Download className="w-4 h-4 mr-2" />
-            Imprimir Cartões ({membrosSelecionados.length})
+            Baixar Cartões ({membrosSelecionados.length})
           </Button>
         </div>
 
