@@ -4,6 +4,14 @@ import { ChevronDown } from 'lucide-react';
 
 const SelectContext = createContext(null);
 
+function getTextFromChildren(children) {
+  if (children === null || children === undefined) return '';
+  if (typeof children === 'string' || typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(getTextFromChildren).join('');
+  if (React.isValidElement(children)) return getTextFromChildren(children.props.children);
+  return '';
+}
+
 export function Select({ children, value, defaultValue, onValueChange, disabled }) {
   const [internalValue, setInternalValue] = useState(defaultValue ?? '');
   const [open, setOpen] = useState(false);
@@ -34,7 +42,11 @@ export function Select({ children, value, defaultValue, onValueChange, disabled 
     [currentValue, open, selectedLabel, disabled]
   );
 
-  return <SelectContext.Provider value={contextValue}>{children}</SelectContext.Provider>;
+  return (
+    <SelectContext.Provider value={contextValue}>
+      <div className="relative w-full">{children}</div>
+    </SelectContext.Provider>
+  );
 }
 
 export function SelectTrigger({ children, className, ...props }) {
@@ -60,10 +72,10 @@ export function SelectTrigger({ children, className, ...props }) {
 export function SelectValue({ placeholder = 'Selecione...' }) {
   const { selectedLabel, value } = useContext(SelectContext);
   if (selectedLabel) {
-    return <span>{selectedLabel}</span>;
+    return <span className="text-sm text-slate-700">{selectedLabel}</span>;
   }
   if (value) {
-    return <span>{value}</span>;
+    return <span className="text-sm text-slate-700">{value}</span>;
   }
   return <span className="text-slate-400">{placeholder}</span>;
 }
@@ -72,8 +84,13 @@ export function SelectContent({ className, children }) {
   const { open, disabled } = useContext(SelectContext);
   if (!open || disabled) return null;
   return (
-    <div className={clsx('relative z-40 mt-2 rounded-xl border border-slate-200 bg-white p-1 shadow-xl', className)}>
-      <div className="max-h-60 overflow-y-auto">{children}</div>
+    <div
+      className={clsx(
+        'absolute left-0 top-full z-50 mt-2 w-full rounded-xl border border-slate-200 bg-white p-1 shadow-xl',
+        className
+      )}
+    >
+      <div className="max-h-72 overflow-y-auto">{children}</div>
     </div>
   );
 }
@@ -81,9 +98,7 @@ export function SelectContent({ className, children }) {
 export function SelectItem({ value, children, className }) {
   const { onChange, value: selectedValue, setSelectedLabel } = useContext(SelectContext);
   const isSelected = selectedValue === value;
-  const labelText = React.Children.toArray(children)
-    .filter((child) => typeof child === 'string')
-    .join(' ');
+  const labelText = getTextFromChildren(children).trim();
 
   React.useEffect(() => {
     if (isSelected && labelText) {

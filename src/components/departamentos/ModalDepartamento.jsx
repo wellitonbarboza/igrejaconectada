@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -26,17 +26,19 @@ const CORES_PADRAO = [
 ];
 
 export default function ModalDepartamento({ departamento, onClose, membros, userCongregacaoId, isAdmin }) {
+  const DRAFT_KEY = 'draft_departamento';
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState(
-    departamento || {
-      nome: '',
-      descricao: '',
-      congregacao_id: isAdmin ? null : userCongregacaoId,
-      lider_id: null,
-      membros_ids: [],
-      cor: '#3b82f6',
-      ativo: true,
-    }
+  const defaultFormData = {
+    nome: '',
+    descricao: '',
+    congregacao_id: isAdmin ? null : userCongregacaoId,
+    lider_id: null,
+    membros_ids: [],
+    cor: '#3b82f6',
+    ativo: true,
+  };
+  const [formData, setFormData] = useState(() =>
+    departamento ? { ...defaultFormData, ...departamento } : defaultFormData
   );
 
   const { data: congregacoes = [] } = useQuery({
@@ -63,6 +65,9 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
       return base44.entities.Departamento.create(dataToSave);
     },
     onSuccess: () => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(DRAFT_KEY);
+      }
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
       onClose();
     },
@@ -95,16 +100,44 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
         (m) => m.congregacao_id === userCongregacaoId || m.congregacao_id === formData.congregacao_id
       );
 
+  const handleSaveDraft = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+  };
+
+  useEffect(() => {
+    if (departamento) return;
+    if (typeof window === 'undefined') return;
+    const storedDraft = window.localStorage.getItem(DRAFT_KEY);
+    if (!storedDraft) return;
+    try {
+      const parsedDraft = JSON.parse(storedDraft);
+      setFormData((prev) => ({ ...prev, ...parsedDraft }));
+    } catch (error) {
+      console.warn('Não foi possível carregar o rascunho do departamento.', error);
+    }
+  }, [departamento]);
+
+  useEffect(() => {
+    if (departamento) return;
+    if (typeof window === 'undefined') return;
+    const timeout = setTimeout(() => {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [formData, departamento]);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">
             {departamento ? 'Editar Departamento' : 'Novo Departamento'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
           <div className="space-y-4">
             <div>
               <Label htmlFor="nome">Nome do Departamento *</Label>
@@ -214,6 +247,9 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
+            </Button>
+            <Button type="button" variant="outline" onClick={handleSaveDraft}>
+              Rascunho
             </Button>
             <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
               {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
