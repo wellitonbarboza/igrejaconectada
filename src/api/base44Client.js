@@ -2,38 +2,13 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'documentos';
-const SESSION_KEY = 'igreja-conectada.profile.session';
-export const ADMIN_DEFAULT_PASSWORD = '123456';
+
 const ADMIN_PROFILE = {
   id: '00000000-0000-0000-0000-000000000001',
   full_name: 'Administrador Geral',
   email: 'admin@igreja.local',
   role: 'admin',
-  access_token: 'admin-session',
-  expires_in: 60 * 60 * 24 * 30,
 };
-const JWT_SEGMENTS = 3;
-
-function isValidJwt(token) {
-  return typeof token === 'string' && token.split('.').length === JWT_SEGMENTS;
-}
-
-function getAuthorizationToken(session) {
-  if (session?.role === 'admin' && SUPABASE_SERVICE_ROLE_KEY) {
-    return SUPABASE_SERVICE_ROLE_KEY;
-  }
-  if (session?.access_token && isValidJwt(session.access_token)) {
-    return session.access_token;
-  }
-  return SUPABASE_ANON_KEY;
-}
-
-function getApiKey(session) {
-  if (session?.role === 'admin' && SUPABASE_SERVICE_ROLE_KEY) {
-    return SUPABASE_SERVICE_ROLE_KEY;
-  }
-  return SUPABASE_ANON_KEY;
-}
 
 function assertSupabaseEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -43,45 +18,18 @@ function assertSupabaseEnv() {
   }
 }
 
-function getStoredSession() {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    console.error('Erro ao ler a sessão do Supabase', error);
-    return null;
-  }
+function getAdminAuthToken() {
+  return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 }
 
-function storeSession(session) {
-  if (typeof window === 'undefined') return;
-  if (!session) {
-    window.localStorage.removeItem(SESSION_KEY);
-    return;
-  }
-  const expiresAt = Date.now() + session.expires_in * 1000;
-  const payload = { ...session, expires_at: expiresAt };
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
-  return payload;
-}
-
-async function ensureSession() {
-  const currentSession = getStoredSession();
-  return currentSession;
+function getAdminApiKey() {
+  return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 }
 
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
-  const session = await ensureSession();
-  const hasServiceRole = Boolean(SUPABASE_SERVICE_ROLE_KEY);
-  if (!session && !hasServiceRole) {
-    throw new Error('Usuário não autenticado. Faça login para continuar.');
-  }
-
-  const sessionOrAdmin = session || { role: 'admin' };
-  const authToken = getAuthorizationToken(sessionOrAdmin);
-  const apiKey = getApiKey(sessionOrAdmin);
+  const authToken = getAdminAuthToken();
+  const apiKey = getAdminApiKey();
   const finalHeaders = {
     apikey: apiKey,
     Authorization: `Bearer ${authToken}`,
@@ -159,29 +107,13 @@ function createEntityClient(table) {
   };
 }
 
-async function fetchProfile(userId) {
-  const data = await authenticatedRequest(`/rest/v1/profiles`, {
-    query: `?select=*&id=eq.${encodeURIComponent(userId)}`,
-  });
-
-  if (Array.isArray(data)) {
-    return data[0];
-  }
-
-  return data;
-}
-
-async function getCurrentUser() {
-  return ensureSession();
-}
-
-async function ensureAdminProfile(profile) {
-  if (!profile?.id) return null;
+async function ensureAdminProfile() {
+  if (!ADMIN_PROFILE?.id) return null;
   const payload = {
-    id: profile.id,
-    full_name: profile.full_name,
-    email: profile.email,
-    role: profile.role,
+    id: ADMIN_PROFILE.id,
+    full_name: ADMIN_PROFILE.full_name,
+    email: ADMIN_PROFILE.email,
+    role: ADMIN_PROFILE.role,
   };
   const data = await authenticatedRequest(`/rest/v1/profiles`, {
     method: 'POST',
@@ -198,25 +130,18 @@ async function ensureAdminProfile(profile) {
 export const base44 = {
   auth: {
     async me() {
-      return getCurrentUser();
+      await ensureAdminProfile();
+      return { ...ADMIN_PROFILE };
     },
-    async login({ password }) {
-      if (password !== ADMIN_DEFAULT_PASSWORD) {
-        throw new Error('Senha de administrador inválida.');
-      }
-      const stored = storeSession(ADMIN_PROFILE);
-      if (!stored) {
-        throw new Error('Não foi possível iniciar a sessão do administrador.');
-      }
-      await ensureAdminProfile(stored);
-      const { access_token, expires_in, expires_at, ...safeProfile } = stored;
-      return safeProfile;
+    async login() {
+      await ensureAdminProfile();
+      return { ...ADMIN_PROFILE };
     },
-    async register({ email, password, full_name, role }) {
+    async register() {
       throw new Error('Cadastro de usuários desativado.');
     },
     async logout() {
-      storeSession(null);
+      return null;
     },
   },
   entities: {
@@ -233,23 +158,17 @@ export const base44 = {
         if (!file) {
           throw new Error('Nenhum arquivo selecionado');
         }
-      const session = await ensureSession();
-      const hasServiceRole = Boolean(SUPABASE_SERVICE_ROLE_KEY);
-      if (!session && !hasServiceRole) {
-        throw new Error('É necessário estar autenticado para enviar arquivos.');
-      }
-      const sessionOrAdmin = session || { role: 'admin' };
-      const authToken = getAuthorizationToken(sessionOrAdmin);
-      const apiKey = getApiKey(sessionOrAdmin);
-      const extension = file.name?.split('.').pop() || 'bin';
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-      const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
-        method: 'POST',
-        headers: {
-          apikey: apiKey,
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': file.type || 'application/octet-stream',
-        },
+        const authToken = getAdminAuthToken();
+        const apiKey = getAdminApiKey();
+        const extension = file.name?.split('.').pop() || 'bin';
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
+          method: 'POST',
+          headers: {
+            apikey: apiKey,
+            Authorization: `Bearer ${authToken}`,
+            'Content-Type': file.type || 'application/octet-stream',
+          },
           body: file,
         });
 

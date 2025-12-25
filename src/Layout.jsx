@@ -9,7 +9,6 @@ import {
   GitBranch,
   FileText,
   CreditCard,
-  LogOut,
   Menu,
   Church,
   Mail,
@@ -29,11 +28,10 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 
 export default function Layout({ children }) {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
 
   const isAdmin = user?.role === 'admin';
 
@@ -92,15 +90,6 @@ export default function Layout({ children }) {
         ]
       : []),
   ];
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Erro ao sair:', error);
-    }
-  };
 
   return (
     <SidebarProvider>
@@ -178,24 +167,18 @@ export default function Layout({ children }) {
                     {user?.full_name?.charAt(0) || 'U'}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-900 text-sm truncate">
-                    {user?.full_name || 'Usuário'}
-                  </p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {user?.role === 'admin' ? 'Administrador' : 'Líder'}
-                  </p>
-                </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-900 text-sm truncate">
+                  {user?.full_name || 'Usuário'}
+                </p>
+                <p className="text-xs text-slate-500 truncate">
+                  {user?.role === 'admin' ? 'Administrador' : 'Líder'}
+                </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="w-full justify-start gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Sair
-              </Button>
+            </div>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                Sessão administrativa fixa.
+              </div>
             </div>
           </SidebarFooter>
         </Sidebar>

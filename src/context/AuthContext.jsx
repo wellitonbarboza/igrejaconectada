@@ -54,7 +54,8 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     await base44.auth.logout();
-    setUser(null);
+    const currentUser = await base44.auth.me();
+    setUser(currentUser);
   }, []);
 
   const value = useMemo(
