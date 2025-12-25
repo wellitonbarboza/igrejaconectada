@@ -8,12 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
-codex/save-photos-and-documents-to-supabase-buckets
 import churchLogo from '@/assets/church-logo.svg';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
-
 import ieadLogo from '@/assets/iead-logo.svg';
-main
+
 
 export default function Cartoes() {
   const { user } = useAuth();
