@@ -1,4 +1,4 @@
-create extension if not exists "pgcrypto";
+create extension if not exists "pgcrypto" with schema extensions;
 
 -- Criação de tabelas principais
 create table if not exists public.profiles (
@@ -44,7 +44,7 @@ begin
   select p.id, p.full_name, p.email, p.role
   from public.profiles p
   where p.email = email_input
-    and p.password_hash = crypt(password_input, p.password_hash);
+    and p.password_hash = extensions.crypt(password_input, p.password_hash);
 end;
 $$;
 
@@ -69,7 +69,7 @@ begin
   insert into public.profiles (email, password_hash, full_name, role)
   values (
     email_input,
-    crypt(password_input, gen_salt('bf')),
+    extensions.crypt(password_input, extensions.gen_salt('bf')),
     full_name_input,
     coalesce(role_input, 'usuario')
   )
