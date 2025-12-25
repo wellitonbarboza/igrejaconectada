@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, Save, Upload, Church, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+codex/save-photos-and-documents-to-supabase-buckets
+import { compressImage } from '@/utils/imageCompression';
+
 import ieadLogo from '@/assets/iead-logo.svg';
+main
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
@@ -91,7 +95,11 @@ export default function Configuracoes() {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const compressedFile = await compressImage(file, { maxSize: 1000, quality: 0.85 });
+      const { file_url } = await base44.integrations.Core.UploadFile({
+        file: compressedFile,
+        bucket: STORAGE_BUCKETS.avatares,
+      });
       handleChange('logo_url', file_url);
     } catch (error) {
       console.error('Erro ao fazer upload da logo:', error);

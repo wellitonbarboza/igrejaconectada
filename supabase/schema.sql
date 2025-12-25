@@ -33,3 +33,12 @@ alter table storage.objects disable row level security;
  grant all on table public.congregacoes to anon, authenticated;
  grant all on table public.configs to anon, authenticated;
  grant all on table storage.objects to anon, authenticated;
+
+-- Garantir buckets básicos de armazenamento
+insert into storage.buckets (id, name, public)
+values
+  ('avatares', 'avatares', true),
+  ('documentos', 'documentos', true)
+on conflict (id) do update
+  set name = excluded.name,
+      public = excluded.public;

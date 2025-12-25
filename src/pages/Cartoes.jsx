@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useState, useRef } from 'react';
+import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Search, Download, Calendar, Hash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,12 +8,19 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
+codex/save-photos-and-documents-to-supabase-buckets
+import churchLogo from '@/assets/church-logo.svg';
+import { uploadElementSnapshot } from '@/utils/documentCapture';
+
 import ieadLogo from '@/assets/iead-logo.svg';
+main
 
 export default function Cartoes() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [membrosSelecionados, setMembrosSelecionados] = useState([]);
+  const cartoesPreviewRef = useRef(null);
+  const cartoesPrintRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -37,7 +44,19 @@ export default function Cartoes() {
 
   const membrosParaImprimir = membros.filter((m) => membrosSelecionados.includes(m.id));
 
-  const handleImprimir = () => {
+  const handleImprimir = async () => {
+    try {
+      const target = cartoesPreviewRef.current || cartoesPrintRef.current;
+      if (target) {
+        await uploadElementSnapshot({
+          element: target,
+          fileNamePrefix: `cartoes-${membrosSelecionados.length}`,
+          bucket: STORAGE_BUCKETS.documentos,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao salvar os cartões no Supabase:', error);
+    }
     window.print();
   };
 
@@ -56,9 +75,17 @@ export default function Cartoes() {
         </div>
 
         <div className="flex-1 flex items-center gap-4">
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-            <span className="text-blue-600 font-bold text-2xl">{membro.nome_completo?.charAt(0)}</span>
-          </div>
+          {membro.foto_url ? (
+            <img
+              src={membro.foto_url}
+              alt={`Foto de ${membro.nome_completo}`}
+              className="w-16 h-16 rounded-full object-cover border-2 border-white"
+            />
+          ) : (
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+              <span className="text-blue-600 font-bold text-2xl">{membro.nome_completo?.charAt(0)}</span>
+            </div>
+          )}
           <div className="flex-1">
             <p className="font-bold text-xl mb-1">{membro.nome_completo}</p>
             <Badge className="bg-white text-blue-600 text-xs">{membro.tipo}</Badge>
@@ -132,9 +159,17 @@ export default function Cartoes() {
                       onChange={() => toggleMembro(membro.id)}
                       className="w-5 h-5 rounded border-slate-300"
                     />
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">{membro.nome_completo?.charAt(0)}</span>
-                    </div>
+                    {membro.foto_url ? (
+                      <img
+                        src={membro.foto_url}
+                        alt={`Foto de ${membro.nome_completo}`}
+                        className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-semibold text-sm">{membro.nome_completo?.charAt(0)}</span>
+                      </div>
+                    )}
                     <div className="flex-1">
                       <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
                       <p className="text-sm text-slate-500">{membro.congregacao_nome}</p>
@@ -167,11 +202,11 @@ export default function Cartoes() {
                 }
               }
             `}</style>
-            <div className="print-area grid grid-cols-2 gap-6">
-              {membrosParaImprimir.map((membro) => (
-                <CartaoMembro key={membro.id} membro={membro} />
-              ))}
-            </div>
+              <div className="print-area grid grid-cols-2 gap-6" ref={cartoesPrintRef}>
+                {membrosParaImprimir.map((membro) => (
+                  <CartaoMembro key={membro.id} membro={membro} />
+                ))}
+              </div>
           </div>
         )}
 
@@ -181,7 +216,7 @@ export default function Cartoes() {
               <CardTitle>Pré-visualização</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-2 gap-6" ref={cartoesPreviewRef}>
                 {membrosParaImprimir.map((membro) => (
                   <CartaoMembro key={membro.id} membro={membro} />
                 ))}
