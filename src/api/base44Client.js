@@ -26,6 +26,32 @@ function getAdminApiKey() {
   return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 }
 
+async function fetchAuthAdminUser(id) {
+  assertSupabaseEnv();
+  const authToken = getAdminAuthToken();
+  const apiKey = getAdminApiKey();
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    if (response.status === 401) {
+      throw new Error(buildUnauthorizedMessage(text));
+    }
+    throw new Error(text || 'Erro ao consultar usuário administrador');
+  }
+
+  return response.json();
+}
+
 function buildUnauthorizedMessage(details) {
   const suffix = details ? ` Detalhes: ${details}` : '';
   return (
@@ -122,6 +148,10 @@ function createEntityClient(table) {
 async function ensureAdminProfile() {
   if (!ADMIN_PROFILE?.id) return null;
   if (!SUPABASE_SERVICE_ROLE_KEY) {
+    return { ...ADMIN_PROFILE };
+  }
+  const adminUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
+  if (!adminUser) {
     return { ...ADMIN_PROFILE };
   }
   const payload = {
