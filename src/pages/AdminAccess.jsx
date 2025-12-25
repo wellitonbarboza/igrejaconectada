@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatError } from '@/utils';
+import { ADMIN_DEFAULT_PASSWORD } from '@/api/base44Client';
 
 export default function AdminAccess() {
   const { signIn } = useAuth();
-  const [password, setPassword] = useState('');
+  const [password] = useState(ADMIN_DEFAULT_PASSWORD);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -63,13 +64,7 @@ export default function AdminAccess() {
             <div>
               <Label htmlFor="admin_password">Senha</Label>
               <div className="mt-2 relative">
-                <Input
-                  id="admin_password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                />
+                <Input id="admin_password" type="password" value={password} disabled />
                 <Lock className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
             </div>
