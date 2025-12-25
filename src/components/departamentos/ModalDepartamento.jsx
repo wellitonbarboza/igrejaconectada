@@ -46,13 +46,31 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
     enabled: isAdmin,
   });
 
+  const normalizeDepartamentoPayload = (data) => {
+    const uuidFields = ['congregacao_id', 'lider_id'];
+    const payload = { ...data };
+
+    uuidFields.forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
+
+    if (!Array.isArray(payload.membros_ids)) {
+      payload.membros_ids = [];
+    }
+
+    return payload;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const lider = membros.find((m) => m.id === data.lider_id);
-      const congregacao = congregacoes.find((c) => c.id === data.congregacao_id);
+      const normalizedData = normalizeDepartamentoPayload(data);
+      const lider = membros.find((m) => m.id === normalizedData.lider_id);
+      const congregacao = congregacoes.find((c) => c.id === normalizedData.congregacao_id);
 
       const dataToSave = {
-        ...data,
+        ...normalizedData,
         lider_nome: lider?.nome_completo || '',
         congregacao_nome: congregacao?.nome || '',
       };

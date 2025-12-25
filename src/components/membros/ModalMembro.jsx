@@ -78,13 +78,47 @@ export default function ModalMembro({
 
   const config = configs[0];
 
+  const normalizeMembroPayload = (data) => {
+    const dateFields = [
+      'data_nascimento',
+      'data_batismo',
+      'data_batismo_espirito_santo',
+      'data_membresia',
+    ];
+    const uuidFields = ['congregacao_id', 'departamento_id'];
+    const payload = { ...data };
+
+    uuidFields.forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
+
+    dateFields.forEach((field) => {
+      if (!payload[field]) {
+        payload[field] = null;
+      }
+    });
+
+    if (!payload.batismo_espirito_santo) {
+      payload.data_batismo_espirito_santo = null;
+    }
+
+    if (!payload.obreiro) {
+      payload.cargo_obreiro = '';
+    }
+
+    return payload;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const normalizedDepartamentoId = data.departamento_id || null;
-      const congregacao = congregacoes.find((c) => c.id === data.congregacao_id);
+      const normalizedData = normalizeMembroPayload(data);
+      const normalizedDepartamentoId = normalizedData.departamento_id || null;
+      const congregacao = congregacoes.find((c) => c.id === normalizedData.congregacao_id);
       const departamento = departamentos.find((d) => d.id === normalizedDepartamentoId);
       const dataToSave = {
-        ...data,
+        ...normalizedData,
         departamento_id: normalizedDepartamentoId,
         congregacao_nome: congregacao?.nome || '',
         departamento_nome: departamento?.nome || '',
@@ -122,7 +156,7 @@ export default function ModalMembro({
 
   const handleChange = (field, value) => {
     const checkboxFields = ['batismo_espirito_santo', 'obreiro', 'ativo'];
-    const nullableFields = ['departamento_id'];
+    const nullableFields = ['departamento_id', 'congregacao_id'];
 
     let nextValue = value;
 

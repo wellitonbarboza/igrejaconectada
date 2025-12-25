@@ -39,12 +39,36 @@ export default function Configuracoes() {
     }
   }, [config]);
 
+  const normalizeConfigPayload = (data) => {
+    const optionalFields = [
+      'endereco_completo',
+      'cidade',
+      'estado',
+      'cep',
+      'telefone',
+      'email',
+      'cnpj',
+      'pastor_presidente',
+      'logo_url',
+    ];
+    const payload = { ...data };
+
+    optionalFields.forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
+
+    return payload;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
+      const normalizedData = normalizeConfigPayload(data);
       if (config) {
-        return base44.entities.Config.update(config.id, data);
+        return base44.entities.Config.update(config.id, normalizedData);
       }
-      return base44.entities.Config.create(data);
+      return base44.entities.Config.create(normalizedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['configs'] });

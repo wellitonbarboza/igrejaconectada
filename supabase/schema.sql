@@ -93,6 +93,10 @@ create table if not exists public.membros (
   created_date timestamp with time zone default now()
 );
 
+alter table public.membros
+  add column if not exists cpf text,
+  add column if not exists rg text;
+
 create table if not exists public.configs (
   id uuid primary key default gen_random_uuid(),
   nome_igreja text not null,
