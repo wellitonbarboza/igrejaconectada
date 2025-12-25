@@ -69,6 +69,50 @@ async function compressImageFile(file) {
   return new File([blob], `${baseName}.${extension}`, { type: outputType });
 }
 
+async function fetchAuthAdminUser(id) {
+  assertSupabaseEnv();
+  const authToken = getAdminAuthToken();
+  const apiKey = getAdminApiKey();
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+
+
+function stripFileExtension(fileName = '') {
+  return fileName.replace(/\.[^/.]+$/, '') || 'arquivo';
+}
+
+async function compressImageFile(file) {
+  if (!file?.type?.startsWith('image/')) {
+    return file;
+  }
+
+  const bitmap = await createImageBitmap(file);
+  const maxSize = 1600;
+  const scale = Math.min(1, maxSize / bitmap.width, maxSize / bitmap.height);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
+
+  ctx.drawImage(bitmap, 0, 0, width, height);
+
+  const outputType = file.type === 'image/png' ? 'image/webp' : file.type || 'image/jpeg';
+  const quality = 0.8;
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, outputType, quality));
+  if (!blob) return file;
+
+  const extension = getFileExtensionFromType(outputType);
+  const baseName = stripFileExtension(file.name);
+  return new File([blob], `${baseName}.${extension}`, { type: outputType });
+}
+
 function buildUnauthorizedMessage(details) {
   const suffix = details ? ` Detalhes: ${details}` : '';
   return (
