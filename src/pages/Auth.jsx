@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Church, Lock, Mail, User, Shield } from 'lucide-react';
@@ -20,6 +20,7 @@ export default function AuthPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
 
   const toggleMode = () => {
     setMode((prev) => (prev === 'login' ? 'register' : 'login'));
@@ -52,6 +53,38 @@ export default function AuthPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event);
+    };
+
+    const handleAppInstalled = () => {
+      setInstallPromptEvent(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPromptEvent) {
+      return;
+    }
+
+    installPromptEvent.prompt();
+    const choiceResult = await installPromptEvent.userChoice;
+    if (choiceResult.outcome !== 'accepted') {
+      return;
+    }
+    setInstallPromptEvent(null);
   };
 
   const from = location.state?.from?.pathname || '/';
@@ -177,6 +210,22 @@ export default function AuthPage() {
                 : 'Criar conta'}
             </Button>
           </form>
+          {installPromptEvent && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-semibold text-slate-700">Instale o app para acesso rápido</p>
+              <p className="mt-1 text-slate-500">
+                Use o app como atalho na tela inicial e receba uma experiência completa.
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-4 w-full"
+                onClick={handleInstallClick}
+              >
+                Instalar app
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
