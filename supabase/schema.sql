@@ -49,6 +49,16 @@ create table if not exists public.departamentos (
   created_date timestamp with time zone default now()
 );
 
+alter table public.congregacoes
+  add column if not exists telefone text,
+  add column if not exists email text,
+  add column if not exists pastor_responsavel text;
+
+alter table public.departamentos
+  add column if not exists lider_id uuid,
+  add column if not exists lider_nome text,
+  add column if not exists membros_ids uuid[];
+
 create table if not exists public.membros (
   id uuid primary key default gen_random_uuid(),
   nome_completo text not null,
