@@ -79,14 +79,6 @@ export function DropdownMenuContent({ align = 'start', className, children }) {
   const { open, setOpen, triggerRef, contentRef } = useContext(DropdownContext);
   const [position, setPosition] = useState({ top: 0, left: 0, right: 0, width: 0 });
 
-  if (!open) return null;
-
-  const alignment = {
-    start: { left: position.left },
-    end: { right: position.right },
-    center: { left: position.left + position.width / 2 },
-  };
-
   const updatePosition = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -99,8 +91,9 @@ export function DropdownMenuContent({ align = 'start', className, children }) {
   };
 
   useLayoutEffect(() => {
-    if (!open) return;
-    updatePosition();
+    if (open) {
+      updatePosition();
+    }
   }, [open]);
 
   useEffect(() => {
@@ -113,6 +106,14 @@ export function DropdownMenuContent({ align = 'start', className, children }) {
       window.removeEventListener('scroll', updatePosition, true);
     };
   }, [open]);
+
+  if (!open) return null;
+
+  const alignment = {
+    start: { left: position.left },
+    end: { right: position.right },
+    center: { left: position.left + position.width / 2 },
+  };
 
   const content = (
     <div
