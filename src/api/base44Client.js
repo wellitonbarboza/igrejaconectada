@@ -109,6 +109,9 @@ function createEntityClient(table) {
 
 async function ensureAdminProfile() {
   if (!ADMIN_PROFILE?.id) return null;
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    return { ...ADMIN_PROFILE };
+  }
   const payload = {
     id: ADMIN_PROFILE.id,
     full_name: ADMIN_PROFILE.full_name,
