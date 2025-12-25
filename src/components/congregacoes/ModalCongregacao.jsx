@@ -21,12 +21,26 @@ export default function ModalCongregacao({ congregacao, onClose }) {
     }
   );
 
+  const normalizeCongregacaoPayload = (data) => {
+    const optionalFields = ['endereco', 'telefone', 'email', 'pastor_responsavel'];
+    const payload = { ...data };
+
+    optionalFields.forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
+
+    return payload;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
+      const normalizedData = normalizeCongregacaoPayload(data);
       if (congregacao) {
-        return base44.entities.Congregacao.update(congregacao.id, data);
+        return base44.entities.Congregacao.update(congregacao.id, normalizedData);
       }
-      return base44.entities.Congregacao.create(data);
+      return base44.entities.Congregacao.create(normalizedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['congregacoes'] });
