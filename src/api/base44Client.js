@@ -3,9 +3,9 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'documentos';
 const SESSION_KEY = 'igreja-conectada.profile.session';
-const ADMIN_DEFAULT_PASSWORD = '123456';
+export const ADMIN_DEFAULT_PASSWORD = '123456';
 const ADMIN_PROFILE = {
-  id: 'admin-geral',
+  id: '00000000-0000-0000-0000-000000000001',
   full_name: 'Administrador Geral',
   email: 'admin@igreja.local',
   role: 'admin',
@@ -175,6 +175,26 @@ async function getCurrentUser() {
   return ensureSession();
 }
 
+async function ensureAdminProfile(profile) {
+  if (!profile?.id) return null;
+  const payload = {
+    id: profile.id,
+    full_name: profile.full_name,
+    email: profile.email,
+    role: profile.role,
+  };
+  const data = await authenticatedRequest(`/rest/v1/profiles`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=representation',
+    },
+    body: JSON.stringify(payload),
+    query: '?on_conflict=id&select=*',
+  });
+  return Array.isArray(data) ? data[0] : data;
+}
+
 export const base44 = {
   auth: {
     async me() {
@@ -188,6 +208,7 @@ export const base44 = {
       if (!stored) {
         throw new Error('Não foi possível iniciar a sessão do administrador.');
       }
+      await ensureAdminProfile(stored);
       const { access_token, expires_in, expires_at, ...safeProfile } = stored;
       return safeProfile;
     },
