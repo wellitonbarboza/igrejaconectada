@@ -60,15 +60,7 @@ export default function Dashboard() {
     .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
     .slice(0, 5);
 
-  const downloadLinks = {
-    mobile: '/download/mobile',
-    desktop: '/download/desktop',
-  };
-
-  const handleDownload = (url) => {
-    if (typeof window === 'undefined') return;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
+  const downloadBaseUrl = createPageUrl('Download');
 
   const stats = [
     {
@@ -164,23 +156,21 @@ export default function Dashboard() {
               Tenha acesso rápido no celular ou no desktop com o aplicativo instalado.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-md"
-                onClick={() => handleDownload(downloadLinks.mobile)}
-                type="button"
-              >
-                <Smartphone className="w-4 h-4 mr-2" />
-                Baixar para celular
-              </Button>
-              <Button
-                variant="outline"
-                className="border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:border-indigo-300"
-                onClick={() => handleDownload(downloadLinks.desktop)}
-                type="button"
-              >
-                <Monitor className="w-4 h-4 mr-2" />
-                Baixar para desktop
-              </Button>
+              <Link to={`${downloadBaseUrl}/mobile`}>
+                <Button className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-md">
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  Baixar para celular
+                </Button>
+              </Link>
+              <Link to={`${downloadBaseUrl}/desktop`}>
+                <Button
+                  variant="outline"
+                  className="border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:border-indigo-300"
+                >
+                  <Monitor className="w-4 h-4 mr-2" />
+                  Baixar para desktop
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
