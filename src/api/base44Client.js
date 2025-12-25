@@ -1,8 +1,7 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'documentos';
-const SESSION_KEY = 'igreja-conectada.supabase.session';
-const REFRESH_MARGIN = 60 * 1000; // 1 minuto
+const SESSION_KEY = 'igreja-conectada.profile.session';
 
 function assertSupabaseEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -35,47 +34,9 @@ function storeSession(session) {
   return payload;
 }
 
-async function refreshSession(session) {
-  assertSupabaseEnv();
-  if (!session?.refresh_token) {
-    throw new Error('Sessão inválida. Faça login novamente.');
-  }
-
-  const response = await fetch(
-    `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
-    {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.refresh_token}`,
-      },
-      body: JSON.stringify({ refresh_token: session.refresh_token }),
-    }
-  );
-
-  if (!response.ok) {
-    storeSession(null);
-    throw new Error('Não foi possível renovar a sessão. Faça login novamente.');
-  }
-
-  const data = await response.json();
-  return storeSession(data);
-}
-
 async function ensureSession() {
   const currentSession = getStoredSession();
-  if (!currentSession) return null;
-  if (!currentSession.expires_at || currentSession.expires_at - Date.now() > REFRESH_MARGIN) {
-    return currentSession;
-  }
-
-  try {
-    return await refreshSession(currentSession);
-  } catch (error) {
-    console.error('Erro ao renovar sessão', error);
-    return null;
-  }
+  return currentSession;
 }
 
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
@@ -87,7 +48,6 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
 
   const finalHeaders = {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${session.access_token}`,
     ...headers,
   };
 
@@ -175,20 +135,7 @@ async function fetchProfile(userId) {
 }
 
 async function getCurrentUser() {
-  const session = await ensureSession();
-  if (!session?.user) return null;
-  const profile = await fetchProfile(session.user.id);
-  if (!profile) {
-    return {
-      id: session.user.id,
-      email: session.user.email,
-      role: 'usuario',
-    };
-  }
-  return {
-    ...profile,
-    email: profile.email || session.user.email,
-  };
+  return ensureSession();
 }
 
 export const base44 = {
@@ -198,13 +145,13 @@ export const base44 = {
     },
     async login({ email, password }) {
       assertSupabaseEnv();
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/authenticate_profile`, {
         method: 'POST',
         headers: {
           apikey: SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email_input: email, password_input: password }),
       });
 
       if (!response.ok) {
@@ -213,18 +160,27 @@ export const base44 = {
       }
 
       const data = await response.json();
-      storeSession(data);
-      return getCurrentUser();
+      const profile = Array.isArray(data) ? data[0] : data;
+      if (!profile?.id) {
+        throw new Error('Usuário ou senha inválidos.');
+      }
+      storeSession(profile);
+      return profile;
     },
     async register({ email, password, full_name, role }) {
       assertSupabaseEnv();
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_profile`, {
         method: 'POST',
         headers: {
           apikey: SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, data: { full_name, role } }),
+        body: JSON.stringify({
+          email_input: email,
+          password_input: password,
+          full_name_input: full_name,
+          role_input: role,
+        }),
       });
 
       if (!response.ok) {
@@ -232,44 +188,15 @@ export const base44 = {
         throw new Error(text || 'Erro ao criar conta');
       }
 
-      const session = await response.json();
-      if (!session.user) {
+      const data = await response.json();
+      const profile = Array.isArray(data) ? data[0] : data;
+      if (!profile?.id) {
         return null;
       }
-
-      const storedSession = storeSession(session);
-
-      if (storedSession?.access_token) {
-        await authenticatedRequest(`/rest/v1/profiles`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=merge-duplicates',
-          },
-          body: JSON.stringify({
-            id: session.user.id,
-            full_name,
-            email,
-            role: role || 'usuario',
-          }),
-          query: '',
-        }).catch(() => null);
-      }
-
-      return getCurrentUser();
+      storeSession(profile);
+      return profile;
     },
     async logout() {
-      assertSupabaseEnv();
-      const session = getStoredSession();
-      if (session?.access_token) {
-        await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
-          method: 'POST',
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }).catch(() => null);
-      }
       storeSession(null);
     },
   },
