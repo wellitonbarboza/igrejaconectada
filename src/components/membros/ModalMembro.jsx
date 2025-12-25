@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
+import { compressImage } from '@/utils/imageCompression';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -159,7 +160,11 @@ export default function ModalMembro({
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const compressedFile = await compressImage(file, { maxSize: 800, quality: 0.8 });
+      const { file_url } = await base44.integrations.Core.UploadFile({
+        file: compressedFile,
+        bucket: STORAGE_BUCKETS.avatares,
+      });
       handleChange('foto_url', file_url);
     } catch (error) {
       console.error('Erro ao fazer upload da foto:', error);

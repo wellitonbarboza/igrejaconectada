@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useState, useRef } from 'react';
+import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Mail, Search, FileText, Download, UserCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
 import churchLogo from '@/assets/church-logo.svg';
+import { uploadElementSnapshot } from '@/utils/documentCapture';
 
 export default function Cartas() {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export default function Cartas() {
   const [incluirFamilia, setIncluirFamilia] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const cartaRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -47,7 +49,18 @@ export default function Cartas() {
     (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleImprimir = () => {
+  const handleImprimir = async () => {
+    try {
+      if (cartaRef.current && membroSelecionado) {
+        await uploadElementSnapshot({
+          element: cartaRef.current,
+          fileNamePrefix: `carta-${membroSelecionado.id}`,
+          bucket: STORAGE_BUCKETS.documentos,
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao salvar a carta no Supabase:', error);
+    }
     window.print();
   };
 
@@ -323,7 +336,7 @@ export default function Cartas() {
             <Button onClick={() => setShowPreview(false)} variant="outline" className="mb-6 print:hidden">
               Voltar
             </Button>
-            <div className="print-area">
+            <div className="print-area" ref={cartaRef}>
               <CartaTemplate />
             </div>
           </div>

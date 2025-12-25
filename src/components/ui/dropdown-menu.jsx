@@ -1,16 +1,35 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 
 const DropdownContext = createContext(null);
 
+const mergeRefs = (...refs) => (node) => {
+  refs.forEach((ref) => {
+    if (!ref) return;
+    if (typeof ref === 'function') {
+      ref(node);
+    } else {
+      ref.current = node;
+    }
+  });
+};
+
 export function DropdownMenu({ children, className }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
+  const triggerRef = useRef(null);
+  const contentRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      const target = event.target;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        !contentRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -19,7 +38,7 @@ export function DropdownMenu({ children, className }) {
   }, [open]);
 
   return (
-    <DropdownContext.Provider value={{ open, setOpen }}>
+    <DropdownContext.Provider value={{ open, setOpen, triggerRef, contentRef }}>
       <div ref={menuRef} className={clsx('relative inline-flex', className)}>
         {children}
       </div>
@@ -28,7 +47,7 @@ export function DropdownMenu({ children, className }) {
 }
 
 export function DropdownMenuTrigger({ asChild = false, children }) {
-  const { setOpen, open } = useContext(DropdownContext);
+  const { setOpen, open, triggerRef } = useContext(DropdownContext);
   const handleClick = (event) => {
     event.preventDefault();
     setOpen(!open);
@@ -36,6 +55,7 @@ export function DropdownMenuTrigger({ asChild = false, children }) {
 
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children, {
+      ref: mergeRefs(triggerRef, children.ref),
       onClick: (event) => {
         children.props.onClick?.(event);
         handleClick(event);
@@ -44,36 +64,73 @@ export function DropdownMenuTrigger({ asChild = false, children }) {
   }
 
   return (
-    <button type="button" onClick={handleClick} className="inline-flex items-center justify-center">
+    <button
+      type="button"
+      ref={triggerRef}
+      onClick={handleClick}
+      className="inline-flex items-center justify-center"
+    >
       {children}
     </button>
   );
 }
 
 export function DropdownMenuContent({ align = 'start', className, children }) {
-  const { open, setOpen } = useContext(DropdownContext);
+  const { open, setOpen, triggerRef, contentRef } = useContext(DropdownContext);
+  const [position, setPosition] = useState({ top: 0, left: 0, right: 0, width: 0 });
 
   if (!open) return null;
 
   const alignment = {
-    start: 'left-0',
-    end: 'right-0',
-    center: 'left-1/2 -translate-x-1/2',
+    start: { left: position.left },
+    end: { right: position.right },
+    center: { left: position.left + position.width / 2 },
   };
 
-  return (
+  const updatePosition = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosition({
+      top: rect.bottom + 8,
+      left: rect.left,
+      right: window.innerWidth - rect.right,
+      width: rect.width,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open]);
+
+  const content = (
     <div
+      ref={contentRef}
       className={clsx(
-        'absolute z-50 mt-2 min-w-[180px] rounded-xl border border-slate-200 bg-white p-1 shadow-xl focus:outline-none',
-        alignment[align] || alignment.start,
+        'fixed z-50 min-w-[180px] rounded-xl border border-slate-200 bg-white p-1 shadow-xl focus:outline-none',
+        align === 'center' && '-translate-x-1/2',
         className
       )}
+      style={{ top: position.top, ...(alignment[align] || alignment.start) }}
       role="menu"
       onClick={() => setOpen(false)}
     >
       {children}
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }
 
 export function DropdownMenuItem({ className, children, ...props }) {
