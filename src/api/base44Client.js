@@ -145,13 +145,14 @@ export const base44 = {
     },
     async login({ email, password }) {
       assertSupabaseEnv();
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/authenticate_profile`, {
-        method: 'POST',
+      const query = `?select=id,full_name,email,role,password_hash&email=eq.${encodeURIComponent(
+        email
+      )}`;
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles${query}`, {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email_input: email, password_input: password }),
       });
 
       if (!response.ok) {
@@ -161,25 +162,27 @@ export const base44 = {
 
       const data = await response.json();
       const profile = Array.isArray(data) ? data[0] : data;
-      if (!profile?.id) {
+      if (!profile?.id || profile.password_hash !== password) {
         throw new Error('Usuário ou senha inválidos.');
       }
-      storeSession(profile);
-      return profile;
+      const { password_hash, ...safeProfile } = profile;
+      storeSession(safeProfile);
+      return safeProfile;
     },
     async register({ email, password, full_name, role }) {
       assertSupabaseEnv();
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_profile`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
         method: 'POST',
         headers: {
           apikey: SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
+          Prefer: 'return=representation',
         },
         body: JSON.stringify({
-          email_input: email,
-          password_input: password,
-          full_name_input: full_name,
-          role_input: role,
+          email,
+          password_hash: password,
+          full_name,
+          role,
         }),
       });
 
@@ -193,8 +196,9 @@ export const base44 = {
       if (!profile?.id) {
         return null;
       }
-      storeSession(profile);
-      return profile;
+      const { password_hash, ...safeProfile } = profile;
+      storeSession(safeProfile);
+      return safeProfile;
     },
     async logout() {
       storeSession(null);
