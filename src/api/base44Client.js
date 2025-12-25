@@ -11,6 +11,18 @@ const ADMIN_PROFILE = {
   access_token: 'admin-session',
   expires_in: 60 * 60 * 24 * 30,
 };
+const JWT_SEGMENTS = 3;
+
+function isValidJwt(token) {
+  return typeof token === 'string' && token.split('.').length === JWT_SEGMENTS;
+}
+
+function getAuthorizationToken(session) {
+  if (session?.access_token && isValidJwt(session.access_token)) {
+    return session.access_token;
+  }
+  return SUPABASE_ANON_KEY;
+}
 
 function assertSupabaseEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -55,8 +67,10 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
     throw new Error('Usuário não autenticado. Faça login para continuar.');
   }
 
+  const authToken = getAuthorizationToken(session);
   const finalHeaders = {
     apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${authToken}`,
     ...headers,
   };
 
@@ -184,19 +198,20 @@ export const base44 = {
         if (!file) {
           throw new Error('Nenhum arquivo selecionado');
         }
-        const session = await ensureSession();
-        if (!session) {
-          throw new Error('É necessário estar autenticado para enviar arquivos.');
-        }
-        const extension = file.name?.split('.').pop() || 'bin';
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
-          method: 'POST',
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': file.type || 'application/octet-stream',
-          },
+      const session = await ensureSession();
+      if (!session) {
+        throw new Error('É necessário estar autenticado para enviar arquivos.');
+      }
+      const authToken = getAuthorizationToken(session);
+      const extension = file.name?.split('.').pop() || 'bin';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+      const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': file.type || 'application/octet-stream',
+        },
           body: file,
         });
 
