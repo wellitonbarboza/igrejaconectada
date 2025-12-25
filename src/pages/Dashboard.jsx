@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { Users, Building2, GitBranch, TrendingUp, UserPlus, Cake } from 'lucide-react';
+import { Users, Building2, GitBranch, TrendingUp, UserPlus, Cake, Download, Smartphone, Monitor } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,16 @@ export default function Dashboard() {
   const membrosRecentes = [...filteredMembros]
     .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
     .slice(0, 5);
+
+  const downloadLinks = {
+    mobile: '/download/mobile',
+    desktop: '/download/desktop',
+  };
+
+  const handleDownload = (url) => {
+    if (typeof window === 'undefined') return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   const stats = [
     {
@@ -141,6 +151,39 @@ export default function Dashboard() {
             </Card>
           ))}
         </div>
+
+        <Card className="shadow-lg border-0">
+          <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-indigo-50">
+            <CardTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5 text-indigo-500" />
+              Baixe o app
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <p className="text-slate-600">
+              Tenha acesso rápido no celular ou no desktop com o aplicativo instalado.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 shadow-md"
+                onClick={() => handleDownload(downloadLinks.mobile)}
+                type="button"
+              >
+                <Smartphone className="w-4 h-4 mr-2" />
+                Baixar para celular
+              </Button>
+              <Button
+                variant="outline"
+                className="border-indigo-200 text-indigo-600 hover:text-indigo-700 hover:border-indigo-300"
+                onClick={() => handleDownload(downloadLinks.desktop)}
+                type="button"
+              >
+                <Monitor className="w-4 h-4 mr-2" />
+                Baixar para desktop
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid lg:grid-cols-2 gap-6">
           <Card className="shadow-lg border-0">
