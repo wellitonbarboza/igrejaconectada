@@ -8,8 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
+codex/save-photos-and-documents-to-supabase-buckets
 import churchLogo from '@/assets/church-logo.svg';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
+
+import ieadLogo from '@/assets/iead-logo.svg';
+main
 
 export default function Cartoes() {
   const { user } = useAuth();
@@ -63,7 +67,7 @@ export default function Cartoes() {
 
       <div className="relative z-10 h-full flex flex-col">
         <div className="flex items-center gap-2 mb-4">
-          <img src={churchLogo} alt="Ícone da Igreja Digital" className="w-6 h-6" />
+          <img src={ieadLogo} alt="Ícone da Igreja Digital" className="w-6 h-6" />
           <div>
             <p className="font-bold text-lg">Igreja Digital</p>
             <p className="text-xs opacity-80">Cartão de Membro</p>
