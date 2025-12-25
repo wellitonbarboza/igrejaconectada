@@ -95,7 +95,9 @@ create table if not exists public.membros (
 
 alter table public.membros
   add column if not exists cpf text,
-  add column if not exists rg text;
+  add column if not exists rg text,
+  add column if not exists cidade_origem text,
+  add column if not exists cidade_destino text;
 
 create table if not exists public.configs (
   id uuid primary key default gen_random_uuid(),
