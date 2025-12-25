@@ -6,22 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ieadLogo from '@/assets/iead-logo.svg';
 
+const netlifyBaseUrl =
+  import.meta.env.VITE_NETLIFY_BASE_URL ||
+  import.meta.env.VITE_NETLIFY_URL ||
+  (typeof window !== 'undefined' ? window.location.origin : undefined);
+
 const downloadLinks = {
-  mobile: import.meta.env.VITE_DOWNLOAD_MOBILE_URL,
-  desktop: import.meta.env.VITE_DOWNLOAD_DESKTOP_URL,
+  mobile: import.meta.env.VITE_DOWNLOAD_MOBILE_URL || netlifyBaseUrl,
+  desktop: import.meta.env.VITE_DOWNLOAD_DESKTOP_URL || netlifyBaseUrl,
 };
 
 const platformDetails = {
   mobile: {
     label: 'celular',
     description: 'Instale o app no seu smartphone para acesso rápido à igreja.',
-    helper: 'Compatível com Android e iOS via navegador.',
+    helper: 'Compatível com Android e iOS via navegador. O download acontece pelo Netlify.',
     icon: Smartphone,
   },
   desktop: {
     label: 'desktop',
     description: 'Tenha o app disponível direto no computador.',
-    helper: 'Compatível com Windows, macOS e Linux.',
+    helper: 'Compatível com Windows, macOS e Linux. O download acontece pelo Netlify.',
     icon: Monitor,
   },
 };
