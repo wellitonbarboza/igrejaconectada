@@ -17,12 +17,10 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
-codex/save-photos-and-documents-to-supabase-buckets
 import churchLogo from '@/assets/church-logo.svg';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
-
 import ieadLogo from '@/assets/iead-logo.svg';
-main
+
 
 export default function Cartas() {
   const { user } = useAuth();
