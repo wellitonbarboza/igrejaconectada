@@ -26,6 +26,15 @@ function getAdminApiKey() {
   return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 }
 
+function buildUnauthorizedMessage(details) {
+  const suffix = details ? ` Detalhes: ${details}` : '';
+  return (
+    'Requisição não autorizada (401). Verifique se o token/chave de autenticação está correto, ' +
+    'se a sessão expirou ou se o usuário possui permissão para este recurso.' +
+    suffix
+  );
+}
+
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
   const authToken = getAdminAuthToken();
@@ -44,6 +53,9 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 401) {
+      throw new Error(buildUnauthorizedMessage(text));
+    }
     throw new Error(text || 'Erro ao comunicar com o Supabase');
   }
 
@@ -177,6 +189,9 @@ export const base44 = {
 
         if (!response.ok) {
           const text = await response.text();
+          if (response.status === 401) {
+            throw new Error(buildUnauthorizedMessage(text));
+          }
           throw new Error(text || 'Erro ao enviar arquivo');
         }
 
