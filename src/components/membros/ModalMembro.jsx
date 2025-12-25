@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Upload, Camera } from 'lucide-react';
+import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,10 @@ export default function ModalMembro({
 }) {
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [recordingField, setRecordingField] = useState(null);
+  const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
+  const recognitionRef = useRef(null);
+  const didPrefillRef = useRef(false);
   const [formData, setFormData] = useState(
     membro || {
       nome_completo: '',
@@ -65,6 +69,14 @@ export default function ModalMembro({
     queryFn: () => base44.entities.Departamento.list('nome'),
     initialData: [],
   });
+
+  const { data: configs = [] } = useQuery({
+    queryKey: ['configs'],
+    queryFn: () => base44.entities.Config.list(),
+    initialData: [],
+  });
+
+  const config = configs[0];
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -123,6 +135,110 @@ export default function ModalMembro({
     setFormData((prev) => ({ ...prev, [field]: nextValue }));
   };
 
+  const speechSupported = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setRecordingField(null);
+  };
+
+  const startRecording = (field) => {
+    if (!speechSupported) return;
+
+    if (recordingField) {
+      stopRecording();
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript)
+        .join(' ')
+        .trim();
+      if (transcript) {
+        setFormData((prev) => ({
+          ...prev,
+          [field]: prev[field] ? `${prev[field].trim()} ${transcript}` : transcript,
+        }));
+      }
+    };
+
+    recognition.onerror = () => {
+      setRecordingField(null);
+    };
+
+    recognition.onend = () => {
+      setRecordingField(null);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    setRecordingField(field);
+    recognition.start();
+  };
+
+  useEffect(() => {
+    if (membro || didPrefillRef.current) return;
+    if (!config) return;
+
+    const hasAnyLocal = formData.cidade || formData.estado || formData.cep;
+    if (!hasAnyLocal) {
+      setFormData((prev) => ({
+        ...prev,
+        cidade: config.cidade || prev.cidade,
+        estado: config.estado || prev.estado,
+        cep: config.cep || prev.cep,
+      }));
+      didPrefillRef.current = true;
+    }
+  }, [config, formData.cidade, formData.estado, formData.cep, membro]);
+
+  useEffect(() => {
+    const cepDigits = (formData.cep || '').replace(/\D/g, '');
+    if (cepDigits.length !== 8) {
+      setCepStatus({ loading: false, error: '' });
+      return;
+    }
+
+    let isActive = true;
+    setCepStatus({ loading: true, error: '' });
+
+    fetch(`https://viacep.com.br/ws/${cepDigits}/json/`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!isActive) return;
+        if (data?.erro) {
+          setCepStatus({ loading: false, error: 'CEP não encontrado.' });
+          return;
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          endereco: data.logradouro || prev.endereco,
+          bairro: data.bairro || prev.bairro,
+          cidade: data.localidade || prev.cidade,
+          estado: data.uf || prev.estado,
+        }));
+        setCepStatus({ loading: false, error: '' });
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setCepStatus({ loading: false, error: 'Não foi possível buscar o CEP agora.' });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [formData.cep]);
+
   const departamentosDisponiveis = isAdmin
     ? departamentos
     : departamentos.filter(
@@ -176,12 +292,27 @@ export default function ModalMembro({
 
             <div className="md:col-span-2">
               <Label htmlFor="nome_completo">Nome Completo *</Label>
-              <Input
-                id="nome_completo"
-                value={formData.nome_completo}
-                onChange={(e) => handleChange('nome_completo', e.target.value)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="nome_completo"
+                  value={formData.nome_completo}
+                  onChange={(e) => handleChange('nome_completo', e.target.value)}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'nome_completo' ? stopRecording() : startRecording('nome_completo'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'nome_completo' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o nome completo"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'nome_completo' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Use o microfone para ditar e edite o texto se necessário.</p>
             </div>
 
             <div>
@@ -319,27 +450,113 @@ export default function ModalMembro({
 
             <div className="md:col-span-2">
               <Label htmlFor="endereco">Endereço</Label>
-              <Input id="endereco" value={formData.endereco} onChange={(e) => handleChange('endereco', e.target.value)} />
+              <div className="relative">
+                <Input
+                  id="endereco"
+                  value={formData.endereco}
+                  onChange={(e) => handleChange('endereco', e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'endereco' ? stopRecording() : startRecording('endereco'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'endereco' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o endereço"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'endereco' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <Label htmlFor="cidade">Cidade</Label>
-              <Input id="cidade" value={formData.cidade} onChange={(e) => handleChange('cidade', e.target.value)} />
+              <div className="relative">
+                <Input
+                  id="cidade"
+                  value={formData.cidade}
+                  onChange={(e) => handleChange('cidade', e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'cidade' ? stopRecording() : startRecording('cidade'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'cidade' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para a cidade"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'cidade' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <Label htmlFor="estado">Estado</Label>
-              <Input id="estado" value={formData.estado} onChange={(e) => handleChange('estado', e.target.value)} placeholder="UF" />
+              <div className="relative">
+                <Input
+                  id="estado"
+                  value={formData.estado}
+                  onChange={(e) => handleChange('estado', e.target.value)}
+                  placeholder="UF"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'estado' ? stopRecording() : startRecording('estado'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'estado' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o estado"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'estado' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <Label htmlFor="cep">CEP</Label>
-              <Input id="cep" value={formData.cep} onChange={(e) => handleChange('cep', e.target.value)} placeholder="00000-000" />
+              <div className="relative">
+                <Input
+                  id="cep"
+                  value={formData.cep}
+                  onChange={(e) => handleChange('cep', e.target.value)}
+                  placeholder="00000-000"
+                  className="pr-10"
+                />
+                {cepStatus.loading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-slate-500" />}
+              </div>
+              {cepStatus.error && <p className="text-xs text-red-600 mt-1">{cepStatus.error}</p>}
+              {!cepStatus.error && !cepStatus.loading && (
+                <p className="text-xs text-slate-500 mt-1">Digite o CEP para preencher endereço automaticamente.</p>
+              )}
             </div>
 
             <div>
               <Label htmlFor="bairro">Bairro</Label>
-              <Input id="bairro" value={formData.bairro} onChange={(e) => handleChange('bairro', e.target.value)} />
+              <div className="relative">
+                <Input
+                  id="bairro"
+                  value={formData.bairro}
+                  onChange={(e) => handleChange('bairro', e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'bairro' ? stopRecording() : startRecording('bairro'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'bairro' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o bairro"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'bairro' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="md:col-span-2 pt-4 border-t">
@@ -358,12 +575,26 @@ export default function ModalMembro({
 
             <div>
               <Label htmlFor="local_batismo">Local do Batismo</Label>
-              <Input
-                id="local_batismo"
-                value={formData.local_batismo}
-                onChange={(e) => handleChange('local_batismo', e.target.value)}
-                placeholder="Ex: Igreja Central, Rio Jordão..."
-              />
+              <div className="relative">
+                <Input
+                  id="local_batismo"
+                  value={formData.local_batismo}
+                  onChange={(e) => handleChange('local_batismo', e.target.value)}
+                  placeholder="Ex: Igreja Central, Rio Jordão..."
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'local_batismo' ? stopRecording() : startRecording('local_batismo'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'local_batismo' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o local do batismo"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'local_batismo' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="md:col-span-2">
@@ -446,12 +677,27 @@ export default function ModalMembro({
 
             <div className="md:col-span-2">
               <Label htmlFor="observacoes">Observações</Label>
-              <Textarea
-                id="observacoes"
-                value={formData.observacoes}
-                onChange={(e) => handleChange('observacoes', e.target.value)}
-                rows={3}
-              />
+              <div className="relative">
+                <Textarea
+                  id="observacoes"
+                  value={formData.observacoes}
+                  onChange={(e) => handleChange('observacoes', e.target.value)}
+                  rows={3}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'observacoes' ? stopRecording() : startRecording('observacoes'))}
+                  className={`absolute right-2 top-3 rounded-full p-1 transition ${
+                    recordingField === 'observacoes' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para observações"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'observacoes' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Após a transcrição, revise e edite se necessário.</p>
             </div>
           </div>
 
