@@ -7,11 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-codex/save-photos-and-documents-to-supabase-buckets
 import { compressImage } from '@/utils/imageCompression';
-
 import ieadLogo from '@/assets/iead-logo.svg';
-main
+
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
