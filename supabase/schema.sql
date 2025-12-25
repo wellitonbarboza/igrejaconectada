@@ -130,6 +130,24 @@ alter table public.departamentos enable row level security;
 alter table public.congregacoes enable row level security;
 alter table public.configs enable row level security;
 
+-- Remover políticas existentes antes de recriar
+drop policy if exists "Selecionar o próprio perfil" on public.profiles;
+drop policy if exists "Atualizar próprio perfil" on public.profiles;
+drop policy if exists "Criar próprio perfil" on public.profiles;
+drop policy if exists "Administradores podem tudo" on public.profiles;
+drop policy if exists "Leitura geral" on public.membros;
+drop policy if exists "Escrita usuários" on public.membros;
+drop policy if exists "Atualizar registros" on public.membros;
+drop policy if exists "Excluir registros" on public.membros;
+drop policy if exists "Leitura" on public.congregacoes;
+drop policy if exists "Mutacao" on public.congregacoes;
+drop policy if exists "Leitura" on public.departamentos;
+drop policy if exists "Mutacao" on public.departamentos;
+drop policy if exists "Leitura" on public.configs;
+drop policy if exists "Mutacao" on public.configs;
+drop policy if exists "Uploads autenticados" on storage.objects;
+drop policy if exists "Leitura pública" on storage.objects;
+
 create policy "Selecionar o próprio perfil" on public.profiles
   for select using (true);
 
@@ -158,17 +176,19 @@ create policy "Excluir registros" on public.membros
 
 -- Replicar as mesmas políticas para congregacoes, departamentos e configs
 create policy "Leitura" on public.congregacoes for select using (true);
-create policy "Mutacao" on public.congregacoes for all using (exists (
-  select 1 from public.profiles p where p.role = 'admin'
-));
+create policy "Mutacao" on public.congregacoes
+  for all
+  using (true)
+  with check (true);
 
 create policy "Leitura" on public.departamentos for select using (true);
 create policy "Mutacao" on public.departamentos for all using (true);
 
 create policy "Leitura" on public.configs for select using (true);
-create policy "Mutacao" on public.configs for update using (exists (
-  select 1 from public.profiles p where p.role = 'admin'
-));
+create policy "Mutacao" on public.configs
+  for all
+  using (true)
+  with check (true);
 
 -- Políticas para storage público
 create policy "Uploads autenticados" on storage.objects
