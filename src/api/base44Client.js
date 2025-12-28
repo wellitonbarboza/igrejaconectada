@@ -213,7 +213,6 @@ async function ensureAdminProfile() {
   if (!SUPABASE_SERVICE_ROLE_KEY) {
     return { ...ADMIN_PROFILE };
   }
-  await ensureAdminUserRecord();
   const existingUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
   if (!existingUser) {
     try {
@@ -236,24 +235,6 @@ async function ensureAdminProfile() {
     role: ADMIN_PROFILE.role,
   };
   const data = await authenticatedRequest(`/rest/v1/profiles`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=representation',
-    },
-    body: JSON.stringify(payload),
-    query: '?on_conflict=id&select=*',
-  });
-  return Array.isArray(data) ? data[0] : data;
-}
-
-async function ensureAdminUserRecord() {
-  if (!ADMIN_PROFILE?.id) return null;
-  const payload = {
-    id: ADMIN_PROFILE.id,
-    email: ADMIN_PROFILE.email,
-  };
-  const data = await authenticatedRequest(`/rest/v1/users`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
