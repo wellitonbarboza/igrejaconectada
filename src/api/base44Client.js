@@ -41,37 +41,19 @@ async function fetchAuthAdminUser(id) {
     },
   });
 
-
-function stripFileExtension(fileName = '') {
-  return fileName.replace(/\.[^/.]+$/, '') || 'arquivo';
-}
-
-async function compressImageFile(file) {
-  if (!file?.type?.startsWith('image/')) {
-    return file;
+  if (response.status === 404) {
+    return null;
   }
 
-  const bitmap = await createImageBitmap(file);
-  const maxSize = 1600;
-  const scale = Math.min(1, maxSize / bitmap.width, maxSize / bitmap.height);
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return file;
+  if (!response.ok) {
+    const text = await response.text();
+    if (response.status === 401) {
+      throw new Error(buildUnauthorizedMessage(text));
+    }
+    throw new Error(text || 'Erro ao consultar usuário administrador');
+  }
 
-  ctx.drawImage(bitmap, 0, 0, width, height);
-
-  const outputType = file.type === 'image/png' ? 'image/webp' : file.type || 'image/jpeg';
-  const quality = 0.8;
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, outputType, quality));
-  if (!blob) return file;
-
-  const extension = getFileExtensionFromType(outputType);
-  const baseName = stripFileExtension(file.name);
-  return new File([blob], `${baseName}.${extension}`, { type: outputType });
+  return response.json();
 }
 
 function buildUnauthorizedMessage(details) {
@@ -170,6 +152,10 @@ function createEntityClient(table) {
 async function ensureAdminProfile() {
   if (!ADMIN_PROFILE?.id) return null;
   if (!SUPABASE_SERVICE_ROLE_KEY) {
+    return { ...ADMIN_PROFILE };
+  }
+  const adminUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
+  if (!adminUser) {
     return { ...ADMIN_PROFILE };
   }
   const payload = {
