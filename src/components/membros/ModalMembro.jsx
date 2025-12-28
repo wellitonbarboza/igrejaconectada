@@ -49,18 +49,33 @@ export default function ModalMembro({
     data_nascimento: '',
     sexo: '',
     estado_civil: '',
+    nome_conjuge: '',
+    conjuge_tipo: '',
+    conjuge_outros: '',
     telefone: '',
     email: '',
+    cpf: '',
+    rg: '',
+    escolaridade: '',
+    profissao: '',
+    nacionalidade: '',
+    nacionalidade_outros: '',
+    naturalidade: '',
+    pai: '',
+    mae: '',
     endereco: '',
     cidade: '',
     estado: '',
     cep: '',
+    religiao_origem: '',
+    data_conversao: '',
     data_batismo: '',
     local_batismo: '',
     batismo_espirito_santo: false,
     data_batismo_espirito_santo: '',
     obreiro: false,
     cargo_obreiro: '',
+    data_obreiro: '',
     departamento_id: null,
     foto_url: '',
     observacoes: '',
@@ -103,9 +118,11 @@ export default function ModalMembro({
   const normalizeMembroPayload = (data) => {
     const dateFields = [
       'data_nascimento',
+      'data_conversao',
       'data_batismo',
       'data_batismo_espirito_santo',
       'data_membresia',
+      'data_obreiro',
     ];
     const uuidFields = ['congregacao_id', 'departamento_id'];
     const payload = { ...data };
@@ -128,6 +145,29 @@ export default function ModalMembro({
 
     if (!payload.obreiro) {
       payload.cargo_obreiro = '';
+      payload.data_obreiro = null;
+    }
+
+    if (payload.estado_civil !== 'casado') {
+      payload.nome_conjuge = '';
+      payload.conjuge_tipo = '';
+      payload.conjuge_outros = '';
+    }
+
+    if (payload.conjuge_tipo !== 'outros') {
+      payload.conjuge_outros = '';
+    }
+
+    if (payload.nacionalidade !== 'estrangeiro') {
+      payload.nacionalidade_outros = '';
+    }
+
+    if (payload.origem !== 'novo') {
+      payload.religiao_origem = '';
+    }
+
+    if (!payload.cargo_obreiro) {
+      payload.data_obreiro = null;
     }
 
     return payload;
@@ -448,6 +488,31 @@ export default function ModalMembro({
               </Select>
             </div>
 
+            {formData.origem === 'novo' && (
+              <div>
+                <Label htmlFor="religiao_origem">Religião de Origem</Label>
+                <div className="relative">
+                  <Input
+                    id="religiao_origem"
+                    value={formData.religiao_origem}
+                    onChange={(e) => handleChange('religiao_origem', e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => (recordingField === 'religiao_origem' ? stopRecording() : startRecording('religiao_origem'))}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                      recordingField === 'religiao_origem' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                    aria-label="Gravar áudio para a religião de origem"
+                    disabled={!speechSupported}
+                  >
+                    {recordingField === 'religiao_origem' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {formData.origem === 'transferencia_recebe' && (
               <div>
                 <Label htmlFor="cidade_origem">Cidade Origem</Label>
@@ -515,6 +580,105 @@ export default function ModalMembro({
             </div>
 
             <div>
+              <Label htmlFor="nacionalidade">Nacionalidade</Label>
+              <Select value={formData.nacionalidade} onValueChange={(value) => handleChange('nacionalidade', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="brasileiro">Brasileiro</SelectItem>
+                  <SelectItem value="estrangeiro">Estrangeiro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.nacionalidade === 'estrangeiro' && (
+              <div>
+                <Label htmlFor="nacionalidade_outros">Nacionalidade (especifique)</Label>
+                <div className="relative">
+                  <Input
+                    id="nacionalidade_outros"
+                    value={formData.nacionalidade_outros}
+                    onChange={(e) => handleChange('nacionalidade_outros', e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      recordingField === 'nacionalidade_outros' ? stopRecording() : startRecording('nacionalidade_outros')
+                    }
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                      recordingField === 'nacionalidade_outros' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                    aria-label="Gravar áudio para a nacionalidade"
+                    disabled={!speechSupported}
+                  >
+                    {recordingField === 'nacionalidade_outros' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="naturalidade">Naturalidade</Label>
+              <div className="relative">
+                <Input
+                  id="naturalidade"
+                  value={formData.naturalidade}
+                  onChange={(e) => handleChange('naturalidade', e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'naturalidade' ? stopRecording() : startRecording('naturalidade'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'naturalidade' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para a naturalidade"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'naturalidade' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="pai">Pai</Label>
+              <div className="relative">
+                <Input id="pai" value={formData.pai} onChange={(e) => handleChange('pai', e.target.value)} className="pr-10" />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'pai' ? stopRecording() : startRecording('pai'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'pai' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o nome do pai"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'pai' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="mae">Mãe</Label>
+              <div className="relative">
+                <Input id="mae" value={formData.mae} onChange={(e) => handleChange('mae', e.target.value)} className="pr-10" />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'mae' ? stopRecording() : startRecording('mae'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'mae' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para o nome da mãe"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'mae' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
               <Label htmlFor="sexo">Sexo</Label>
               <Select value={formData.sexo} onValueChange={(value) => handleChange('sexo', value)}>
                 <SelectTrigger>
@@ -541,6 +705,72 @@ export default function ModalMembro({
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.estado_civil === 'casado' && (
+              <>
+                <div>
+                  <Label htmlFor="nome_conjuge">Nome Cônjuge</Label>
+                  <div className="relative">
+                    <Input
+                      id="nome_conjuge"
+                      value={formData.nome_conjuge}
+                      onChange={(e) => handleChange('nome_conjuge', e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => (recordingField === 'nome_conjuge' ? stopRecording() : startRecording('nome_conjuge'))}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                        recordingField === 'nome_conjuge' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                      aria-label="Gravar áudio para o nome do cônjuge"
+                      disabled={!speechSupported}
+                    >
+                      {recordingField === 'nome_conjuge' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="conjuge_tipo">Cônjuge é</Label>
+                  <Select value={formData.conjuge_tipo} onValueChange={(value) => handleChange('conjuge_tipo', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="membro">Membro</SelectItem>
+                      <SelectItem value="congregado">Congregado</SelectItem>
+                      <SelectItem value="outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.conjuge_tipo === 'outros' && (
+                  <div>
+                    <Label htmlFor="conjuge_outros">Cônjuge é (especifique)</Label>
+                    <div className="relative">
+                      <Input
+                        id="conjuge_outros"
+                        value={formData.conjuge_outros}
+                        onChange={(e) => handleChange('conjuge_outros', e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => (recordingField === 'conjuge_outros' ? stopRecording() : startRecording('conjuge_outros'))}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                          recordingField === 'conjuge_outros' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                        aria-label="Gravar áudio para o tipo de cônjuge"
+                        disabled={!speechSupported}
+                      >
+                        {recordingField === 'conjuge_outros' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             <div>
               <Label htmlFor="telefone">Telefone</Label>
@@ -575,6 +805,47 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="rg">RG</Label>
               <Input id="rg" value={formData.rg} onChange={(e) => handleChange('rg', e.target.value)} />
+            </div>
+
+            <div>
+              <Label htmlFor="escolaridade">Escolaridade</Label>
+              <Select value={formData.escolaridade} onValueChange={(value) => handleChange('escolaridade', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="analfabeto">Analfabeto</SelectItem>
+                  <SelectItem value="fundamental_incompleto">Fundamental Incompleto</SelectItem>
+                  <SelectItem value="fundamental_completo">Fundamental Completo</SelectItem>
+                  <SelectItem value="medio_incompleto">Médio Incompleto</SelectItem>
+                  <SelectItem value="medio_completo">Médio Completo</SelectItem>
+                  <SelectItem value="superior_incompleto">Superior Incompleto</SelectItem>
+                  <SelectItem value="superior_completo">Superior Completo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="profissao">Profissão</Label>
+              <div className="relative">
+                <Input
+                  id="profissao"
+                  value={formData.profissao}
+                  onChange={(e) => handleChange('profissao', e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => (recordingField === 'profissao' ? stopRecording() : startRecording('profissao'))}
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
+                    recordingField === 'profissao' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  aria-label="Gravar áudio para a profissão"
+                  disabled={!speechSupported}
+                >
+                  {recordingField === 'profissao' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="md:col-span-2">
@@ -693,6 +964,16 @@ export default function ModalMembro({
             </div>
 
             <div>
+              <Label htmlFor="data_conversao">Data de Conversão</Label>
+              <Input
+                id="data_conversao"
+                type="date"
+                value={formData.data_conversao}
+                onChange={(e) => handleChange('data_conversao', e.target.value)}
+              />
+            </div>
+
+            <div>
               <Label htmlFor="data_batismo">Data do Batismo nas Águas</Label>
               <Input
                 id="data_batismo"
@@ -700,30 +981,6 @@ export default function ModalMembro({
                 value={formData.data_batismo}
                 onChange={(e) => handleChange('data_batismo', e.target.value)}
               />
-            </div>
-
-            <div>
-              <Label htmlFor="local_batismo">Local do Batismo</Label>
-              <div className="relative">
-                <Input
-                  id="local_batismo"
-                  value={formData.local_batismo}
-                  onChange={(e) => handleChange('local_batismo', e.target.value)}
-                  placeholder="Ex: Igreja Central, Rio Jordão..."
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => (recordingField === 'local_batismo' ? stopRecording() : startRecording('local_batismo'))}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 transition ${
-                    recordingField === 'local_batismo' ? 'bg-red-100 text-red-600' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                  aria-label="Gravar áudio para o local do batismo"
-                  disabled={!speechSupported}
-                >
-                  {recordingField === 'local_batismo' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </button>
-              </div>
             </div>
 
             <div className="md:col-span-2">
@@ -784,6 +1041,18 @@ export default function ModalMembro({
                     <SelectItem value="pastor">Pastor</SelectItem>
                   </SelectContent>
                 </Select>
+                {formData.cargo_obreiro && (
+                  <div className="mt-4">
+                    <Label htmlFor="data_obreiro">Data</Label>
+                    <Input
+                      id="data_obreiro"
+                      type="date"
+                      value={formData.data_obreiro}
+                      onChange={(e) => handleChange('data_obreiro', e.target.value)}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
