@@ -143,6 +143,26 @@ function buildUnauthorizedMessage(details) {
   );
 }
 
+function parseSupabaseErrorMessage(message) {
+  if (!message) return null;
+  if (typeof message !== 'string') return null;
+  try {
+    return JSON.parse(message);
+  } catch (error) {
+    return null;
+  }
+}
+
+function isEmailExistsError(error) {
+  const message = error?.message;
+  if (!message) return false;
+  if (typeof message === 'string' && message.includes('email_exists')) {
+    return true;
+  }
+  const parsed = parseSupabaseErrorMessage(message);
+  return parsed?.error_code === 'email_exists';
+}
+
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
   const authToken = getAdminAuthToken();
@@ -234,12 +254,18 @@ async function ensureAdminProfile() {
   }
   const existingUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
   if (!existingUser) {
-    await createAuthAdminUser({
-      user_id: ADMIN_PROFILE.id,
-      email: ADMIN_PROFILE.email,
-      full_name: ADMIN_PROFILE.full_name,
-      role: ADMIN_PROFILE.role,
-    });
+    try {
+      await createAuthAdminUser({
+        user_id: ADMIN_PROFILE.id,
+        email: ADMIN_PROFILE.email,
+        full_name: ADMIN_PROFILE.full_name,
+        role: ADMIN_PROFILE.role,
+      });
+    } catch (error) {
+      if (!isEmailExistsError(error)) {
+        throw error;
+      }
+    }
   }
   const payload = {
     id: ADMIN_PROFILE.id,
