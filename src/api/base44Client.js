@@ -163,6 +163,17 @@ function isEmailExistsError(error) {
   return parsed?.error_code === 'email_exists';
 }
 
+function isMissingTableError(error) {
+  const message = error?.message;
+  if (!message) return false;
+  if (typeof message === 'string') {
+    if (message.includes('PGRST205')) return true;
+    if (message.includes("Could not find the table 'public.users'")) return true;
+  }
+  const parsed = parseSupabaseErrorMessage(message);
+  return parsed?.code === 'PGRST205';
+}
+
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
   const authToken = getAdminAuthToken();
@@ -292,16 +303,23 @@ async function ensureAdminUserRecord() {
     id: ADMIN_PROFILE.id,
     email: ADMIN_PROFILE.email,
   };
-  const data = await authenticatedRequest(`/rest/v1/users`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=representation',
-    },
-    body: JSON.stringify(payload),
-    query: '?on_conflict=id&select=*',
-  });
-  return Array.isArray(data) ? data[0] : data;
+  try {
+    const data = await authenticatedRequest(`/rest/v1/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(payload),
+      query: '?on_conflict=id&select=*',
+    });
+    return Array.isArray(data) ? data[0] : data;
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export const base44 = {
