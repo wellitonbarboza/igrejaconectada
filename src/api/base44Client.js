@@ -40,56 +40,12 @@ async function fetchAuthAdminUser(id) {
       Authorization: `Bearer ${authToken}`,
     },
   });
-  if (response.status === 404) {
-    return null;
-  }
   if (!response.ok) {
     const text = await response.text();
     if (response.status === 401) {
       throw new Error(buildUnauthorizedMessage(text));
     }
     throw new Error(text || 'Erro ao buscar usuário');
-  }
-
-  return response.json();
-}
-
-function generateTemporaryPassword() {
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    const bytes = new Uint8Array(24);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-async function createAuthAdminUser({ user_id, email, full_name, role }) {
-  assertSupabaseEnv();
-  const authToken = getAdminAuthToken();
-  const apiKey = getAdminApiKey();
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-    method: 'POST',
-    headers: {
-      apikey: apiKey,
-      Authorization: `Bearer ${authToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      user_id,
-      email,
-      password: generateTemporaryPassword(),
-      email_confirm: true,
-      app_metadata: role ? { role } : {},
-      user_metadata: full_name ? { full_name } : {},
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    if (response.status === 401) {
-      throw new Error(buildUnauthorizedMessage(text));
-    }
-    throw new Error(text || 'Erro ao criar usuário');
   }
 
   return response.json();
@@ -192,15 +148,6 @@ async function ensureAdminProfile() {
   if (!ADMIN_PROFILE?.id) return null;
   if (!SUPABASE_SERVICE_ROLE_KEY) {
     return { ...ADMIN_PROFILE };
-  }
-  const existingUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
-  if (!existingUser) {
-    await createAuthAdminUser({
-      user_id: ADMIN_PROFILE.id,
-      email: ADMIN_PROFILE.email,
-      full_name: ADMIN_PROFILE.full_name,
-      role: ADMIN_PROFILE.role,
-    });
   }
   const payload = {
     id: ADMIN_PROFILE.id,
