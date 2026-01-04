@@ -69,8 +69,15 @@ export default function Departamentos() {
 
   const membrosPorDepartamento = useMemo(() => {
     return membrosFiltrados.reduce((acc, membro) => {
-      if (!membro.departamento_id) return acc;
-      acc[membro.departamento_id] = (acc[membro.departamento_id] || 0) + 1;
+      const departamentosIds = Array.isArray(membro.departamentos_ids)
+        ? membro.departamentos_ids
+        : membro.departamento_id
+        ? [membro.departamento_id]
+        : [];
+      departamentosIds.forEach((departamentoId) => {
+        if (!departamentoId) return;
+        acc[departamentoId] = (acc[departamentoId] || 0) + 1;
+      });
       return acc;
     }, {});
   }, [membrosFiltrados]);

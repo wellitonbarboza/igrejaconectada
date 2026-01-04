@@ -134,7 +134,14 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
       ? departamento.membros_ids
       : [];
     const membrosVinculados = membros
-      .filter((membro) => membro.departamento_id === departamento.id)
+      .filter((membro) => {
+        const departamentosIds = Array.isArray(membro.departamentos_ids)
+          ? membro.departamentos_ids
+          : membro.departamento_id
+          ? [membro.departamento_id]
+          : [];
+        return departamentosIds.includes(departamento.id);
+      })
       .map((membro) => membro.id);
     const membrosUnicos = Array.from(new Set([...membrosIdsAtualizados, ...membrosVinculados]));
     setFormData((prev) => ({
