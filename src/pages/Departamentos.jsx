@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GitBranch, Plus, Users, Edit, Trash2, MoreVertical } from 'lucide-react';
@@ -46,6 +46,18 @@ export default function Departamentos() {
     : departamentos.filter(
         (d) => !d.congregacao_id || d.congregacao_id === user?.congregacao_id
       );
+
+  const membrosFiltrados = isAdmin
+    ? membros
+    : membros.filter((m) => m.congregacao_id === user?.congregacao_id);
+
+  const membrosPorDepartamento = useMemo(() => {
+    return membrosFiltrados.reduce((acc, membro) => {
+      if (!membro.departamento_id) return acc;
+      acc[membro.departamento_id] = (acc[membro.departamento_id] || 0) + 1;
+      return acc;
+    }, {});
+  }, [membrosFiltrados]);
 
   const handleEdit = (departamento) => {
     setDepartamentoSelecionado(departamento);
@@ -147,7 +159,7 @@ export default function Departamentos() {
 
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                        {departamento.membros_ids?.length || 0} membros
+                        {membrosPorDepartamento[departamento.id] || 0} membros
                       </Badge>
                       {departamento.ativo ? (
                         <Badge className="bg-green-100 text-green-700">Ativo</Badge>
