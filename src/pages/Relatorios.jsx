@@ -7,6 +7,7 @@ import {
   Users,
   Download,
   TrendingUp,
+  ImageDown,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,192 @@ export default function Relatorios() {
     feminino: filteredMembros.filter((m) => m.sexo === 'feminino').length,
   };
 
+  const getSemanasDoMes = () => {
+    const anoAtual = new Date().getFullYear();
+    const primeiroDiaMes = new Date(anoAtual, mesSelecionado, 1);
+    const inicioCalendario = new Date(primeiroDiaMes);
+    inicioCalendario.setDate(primeiroDiaMes.getDate() - primeiroDiaMes.getDay());
+
+    const semanasMap = new Map();
+
+    aniversariantes.forEach((membro) => {
+      const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
+      const dataSemana = new Date(anoAtual, mesSelecionado, dataNasc.getDate());
+      const diffDias = Math.floor((dataSemana - inicioCalendario) / (1000 * 60 * 60 * 24));
+      const indiceSemana = Math.floor(diffDias / 7);
+
+      if (!semanasMap.has(indiceSemana)) {
+        const inicioSemana = new Date(inicioCalendario);
+        inicioSemana.setDate(inicioCalendario.getDate() + indiceSemana * 7);
+        const fimSemana = new Date(inicioSemana);
+        fimSemana.setDate(inicioSemana.getDate() + 6);
+
+        semanasMap.set(indiceSemana, {
+          indice: indiceSemana + 1,
+          inicio: inicioSemana,
+          fim: fimSemana,
+          membros: [],
+        });
+      }
+
+      semanasMap.get(indiceSemana).membros.push({
+        ...membro,
+        dataSemana,
+      });
+    });
+
+    return Array.from(semanasMap.values())
+      .sort((a, b) => a.inicio - b.inicio)
+      .map((semana) => ({
+        ...semana,
+        membros: semana.membros.sort((a, b) => a.dataSemana - b.dataSemana),
+      }));
+  };
+
+  const handleDownloadImagem = () => {
+    if (!aniversariantes.length) return;
+
+    const largura = 1080;
+    const padding = 80;
+    const larguraTexto = largura - padding * 2;
+    const semanas = getSemanasDoMes();
+
+    const fontes = {
+      titulo: "bold 52px 'Poppins', sans-serif",
+      subtitulo: "500 28px 'Poppins', sans-serif",
+      semana: "600 34px 'Poppins', sans-serif",
+      linha: "400 28px 'Poppins', sans-serif",
+      rodape: "400 24px 'Poppins', sans-serif",
+    };
+
+    const getWrappedLines = (contexto, fonte, texto) => {
+      contexto.font = fonte;
+      const palavras = texto.split(' ');
+      const linhas = [];
+      let linhaAtual = '';
+
+      palavras.forEach((palavra) => {
+        const tentativa = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
+        if (contexto.measureText(tentativa).width > larguraTexto && linhaAtual) {
+          linhas.push(linhaAtual);
+          linhaAtual = palavra;
+        } else {
+          linhaAtual = tentativa;
+        }
+      });
+
+      if (linhaAtual) {
+        linhas.push(linhaAtual);
+      }
+
+      return linhas;
+    };
+
+    semanas.forEach((semana, index) => {
+      const canvas = document.createElement('canvas');
+      const contexto = canvas.getContext('2d');
+
+      if (!contexto) return;
+
+      const cabecalhoSemana = `${format(semana.inicio, 'dd/MM')} - ${format(semana.fim, 'dd/MM')}`;
+
+      let alturaConteudo = 0;
+      const linhasSemana = getWrappedLines(contexto, fontes.semana, cabecalhoSemana);
+      alturaConteudo += linhasSemana.length * 42 + 16;
+
+      semana.membros.forEach((membro) => {
+        const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
+        const textoLinha = `${membro.nome_completo} — ${format(dataNasc, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
+        const linhas = getWrappedLines(contexto, fontes.linha, textoLinha);
+        alturaConteudo += linhas.length * 34 + 8;
+      });
+
+      const linhasSubtitulo = getWrappedLines(contexto, fontes.subtitulo, `Mês de ${meses[mesSelecionado]}`);
+      const linhasRodape = getWrappedLines(
+        contexto,
+        fontes.rodape,
+        'Que Deus continue abençoando as suas vidas. Somos Gratos por mais um ano estar conosco.',
+      );
+
+      const alturaTotal =
+        padding +
+        70 +
+        linhasSubtitulo.length * 32 +
+        20 +
+        alturaConteudo +
+        linhasRodape.length * 28 +
+        padding;
+
+      canvas.width = largura;
+      canvas.height = alturaTotal;
+
+      const gradiente = contexto.createLinearGradient(0, 0, largura, alturaTotal);
+      gradiente.addColorStop(0, '#FDE2E2');
+      gradiente.addColorStop(0.5, '#F4C4F3');
+      gradiente.addColorStop(1, '#C3CFE2');
+
+      contexto.fillStyle = gradiente;
+      contexto.fillRect(0, 0, largura, alturaTotal);
+
+      contexto.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      contexto.beginPath();
+      contexto.arc(largura - 140, 140, 120, 0, Math.PI * 2);
+      contexto.fill();
+
+      contexto.beginPath();
+      contexto.arc(120, alturaTotal - 160, 140, 0, Math.PI * 2);
+      contexto.fill();
+
+      let posicaoY = padding;
+
+      contexto.fillStyle = '#3B0764';
+      contexto.font = fontes.titulo;
+      contexto.fillText('Aniversariantes da Semana', padding, posicaoY);
+
+      posicaoY += 70;
+      contexto.font = fontes.subtitulo;
+      linhasSubtitulo.forEach((linha) => {
+        contexto.fillText(linha, padding, posicaoY);
+        posicaoY += 32;
+      });
+
+      posicaoY += 20;
+
+      contexto.font = fontes.semana;
+      contexto.fillStyle = '#6B21A8';
+      getWrappedLines(contexto, fontes.semana, cabecalhoSemana).forEach((linha) => {
+        contexto.fillText(linha, padding, posicaoY);
+        posicaoY += 42;
+      });
+
+      posicaoY += 8;
+      contexto.font = fontes.linha;
+      contexto.fillStyle = '#1F2937';
+
+      semana.membros.forEach((membro) => {
+        const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
+        const textoLinha = `${membro.nome_completo} — ${format(dataNasc, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
+        getWrappedLines(contexto, fontes.linha, textoLinha).forEach((linha) => {
+          contexto.fillText(linha, padding, posicaoY);
+          posicaoY += 34;
+        });
+        posicaoY += 6;
+      });
+
+      contexto.font = fontes.rodape;
+      contexto.fillStyle = '#4C1D95';
+      linhasRodape.forEach((linha) => {
+        contexto.fillText(linha, padding, posicaoY);
+        posicaoY += 28;
+      });
+
+      const link = document.createElement('a');
+      link.download = `aniversariantes-${meses[mesSelecionado].toLowerCase()}-semana-${index + 1}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  };
+
   const handleDownloadPDF = () => {
     window.print();
   };
@@ -95,13 +282,25 @@ export default function Relatorios() {
               Gere relatórios e estatísticas da sua {isAdmin ? 'igreja' : 'congregação'}
             </p>
           </div>
-          <Button
-            onClick={handleDownloadPDF}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg print:hidden"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Baixar PDF
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 print:hidden">
+            {tipoRelatorio === 'aniversariantes' && (
+              <Button
+                onClick={handleDownloadImagem}
+                disabled={!aniversariantes.length}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 shadow-lg"
+              >
+                <ImageDown className="w-4 h-4 mr-2" />
+                Gerar imagem
+              </Button>
+            )}
+            <Button
+              onClick={handleDownloadPDF}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Baixar PDF
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-lg border-0 print:hidden">
