@@ -168,8 +168,16 @@ export default function DetalhesMembro() {
               <InfoRow icon={User} label="RG" value={membro.rg} />
               <InfoRow icon={Heart} label="Estado Civil" value={membro.estado_civil} />
               <InfoRow icon={User} label="Sexo" value={membro.sexo === 'masculino' ? 'Masculino' : membro.sexo === 'feminino' ? 'Feminino' : null} />
-              {membro.departamento_nome && (
-                <InfoRow icon={GitBranch} label="Departamento" value={membro.departamento_nome} />
+              {(membro.departamentos_nomes?.length || membro.departamento_nome) && (
+                <InfoRow
+                  icon={GitBranch}
+                  label="Departamentos"
+                  value={
+                    Array.isArray(membro.departamentos_nomes) && membro.departamentos_nomes.length > 0
+                      ? membro.departamentos_nomes.join(', ')
+                      : membro.departamento_nome
+                  }
+                />
               )}
             </div>
           </CardContent>

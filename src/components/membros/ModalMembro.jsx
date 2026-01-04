@@ -89,6 +89,7 @@ export default function ModalMembro({
     cargo_obreiro: '',
     data_obreiro: '',
     departamento_id: null,
+    departamentos_ids: [],
     foto_url: '',
     foto_path: '',
     foto_bucket: STORAGE_BUCKETS.fotosMembros,
@@ -98,21 +99,18 @@ export default function ModalMembro({
     cidade_destino: '',
     ativo: true,
   };
-  const resolveFotoUrl = (data) => resolveMemberPhotoUrl(data);
-
-  const buildInitialFormData = () => {
+  const [formData, setFormData] = useState(() => {
     if (!membro) return defaultFormData;
+    const departamentosIdsFromMembro = Array.isArray(membro.departamentos_ids) ? membro.departamentos_ids : [];
+    const fallbackDepartamentoId = membro.departamento_id ? [membro.departamento_id] : [];
     return {
       ...defaultFormData,
       ...membro,
-      foto_url: resolveFotoUrl(membro),
-      foto_bucket: membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
+      departamentos_ids: Array.from(new Set([...departamentosIdsFromMembro, ...fallbackDepartamentoId])),
       origem: normalizeOrigem(membro.origem || defaultFormData.origem),
       status: membro.status || defaultFormData.status,
     };
-  };
-
-  const [formData, setFormData] = useState(buildInitialFormData);
+  });
   const updateFormData = (updater) => {
     setFormData((prev) => {
       const nextValue = typeof updater === 'function' ? updater(prev) : updater;
@@ -196,20 +194,33 @@ export default function ModalMembro({
       payload.data_obreiro = null;
     }
 
+    if (!Array.isArray(payload.departamentos_ids)) {
+      payload.departamentos_ids = [];
+    }
+
+    payload.departamentos_ids = payload.departamentos_ids.filter(Boolean);
+
     return payload;
   };
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const normalizedData = normalizeMembroPayload(data);
-      const normalizedDepartamentoId = normalizedData.departamento_id || null;
+      const departamentosIds = Array.isArray(normalizedData.departamentos_ids)
+        ? normalizedData.departamentos_ids
+        : normalizedData.departamento_id
+        ? [normalizedData.departamento_id]
+        : [];
+      const normalizedDepartamentoId = departamentosIds[0] || null;
       const congregacao = congregacoes.find((c) => c.id === normalizedData.congregacao_id);
-      const departamento = departamentos.find((d) => d.id === normalizedDepartamentoId);
+      const departamentosSelecionados = departamentos.filter((d) => departamentosIds.includes(d.id));
       const dataToSave = {
         ...normalizedData,
+        departamentos_ids: departamentosIds,
         departamento_id: normalizedDepartamentoId,
         congregacao_nome: congregacao?.nome || '',
-        departamento_nome: departamento?.nome || '',
+        departamento_nome: departamentosSelecionados.map((dept) => dept.nome).join(', '),
+        departamentos_nomes: departamentosSelecionados.map((dept) => dept.nome),
       };
 
       if (membro) {
@@ -307,6 +318,19 @@ export default function ModalMembro({
         updated.status = 'transferido';
       }
       return updated;
+    });
+  };
+
+  const handleDepartamentoToggle = (departamentoId) => {
+    updateFormData((prev) => {
+      const currentIds = Array.isArray(prev.departamentos_ids) ? prev.departamentos_ids : [];
+      const nextIds = currentIds.includes(departamentoId)
+        ? currentIds.filter((id) => id !== departamentoId)
+        : [...currentIds, departamentoId];
+      return {
+        ...prev,
+        departamentos_ids: nextIds,
+      };
     });
   };
 
@@ -1253,20 +1277,39 @@ export default function ModalMembro({
             )}
 
             <div className="md:col-span-2">
-              <Label htmlFor="departamento_id">Departamento</Label>
-              <Select value={formData.departamento_id || ''} onValueChange={(value) => handleChange('departamento_id', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um departamento (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Nenhum departamento</SelectItem>
-                  {departamentosDisponiveis.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.nome} {dept.congregacao_nome ? `- ${dept.congregacao_nome}` : '(Global)'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between gap-4">
+                <Label>Departamentos</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleChange('departamentos_ids', [])}
+                  className="text-xs"
+                >
+                  Limpar seleção
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Você pode selecionar mais de um departamento.</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {departamentosDisponiveis.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhum departamento disponível.</p>
+                ) : (
+                  departamentosDisponiveis.map((dept) => (
+                    <label
+                      key={dept.id}
+                      className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm text-slate-700"
+                    >
+                      <Checkbox
+                        checked={formData.departamentos_ids?.includes(dept.id)}
+                        onCheckedChange={() => handleDepartamentoToggle(dept.id)}
+                      />
+                      <span>
+                        {dept.nome} {dept.congregacao_nome ? `- ${dept.congregacao_nome}` : '(Global)'}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
 
             <div className="md:col-span-2">
