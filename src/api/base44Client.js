@@ -76,6 +76,15 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
   assertSupabaseEnv();
   const authToken = getAdminAuthToken();
   const apiKey = getAdminApiKey();
+  const contentTypeHeader = Object.keys(headers).find(
+    (headerName) => headerName.toLowerCase() === 'content-type'
+  );
+  const contentType = contentTypeHeader ? headers[contentTypeHeader] : '';
+  const shouldStringifyBody =
+    body &&
+    typeof body === 'object' &&
+    !(body instanceof FormData) &&
+    contentType.includes('application/json');
   const finalHeaders = {
     apikey: apiKey,
     Authorization: `Bearer ${authToken}`,
@@ -85,7 +94,7 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
   const response = await fetch(`${SUPABASE_URL}${path}${query}`, {
     method,
     headers: finalHeaders,
-    body,
+    body: shouldStringifyBody ? JSON.stringify(body) : body,
   });
 
   if (!response.ok) {
