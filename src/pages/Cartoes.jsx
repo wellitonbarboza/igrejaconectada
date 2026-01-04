@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS, buildStoragePublicUrl } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Search, Download, Calendar, Hash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,6 +58,10 @@ export default function Cartoes() {
     window.print();
   };
 
+  const resolveFotoUrl = (membro) =>
+    membro.foto_url ||
+    buildStoragePublicUrl(membro.foto_bucket || STORAGE_BUCKETS.avatares, membro.foto_path);
+
   const CartaoMembro = ({ membro }) => (
     <div className="w-[350px] h-[220px] bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden print:break-inside-avoid print:mb-4">
       <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -mr-20 -mt-20" />
@@ -73,9 +77,9 @@ export default function Cartoes() {
         </div>
 
         <div className="flex-1 flex items-center gap-4">
-          {membro.foto_url ? (
+          {resolveFotoUrl(membro) ? (
             <img
-              src={membro.foto_url}
+              src={resolveFotoUrl(membro)}
               alt={`Foto de ${membro.nome_completo}`}
               className="w-16 h-16 rounded-full object-cover border-2 border-white"
             />
@@ -157,9 +161,9 @@ export default function Cartoes() {
                       onChange={() => toggleMembro(membro.id)}
                       className="w-5 h-5 rounded border-slate-300"
                     />
-                    {membro.foto_url ? (
+                    {resolveFotoUrl(membro) ? (
                       <img
-                        src={membro.foto_url}
+                        src={resolveFotoUrl(membro)}
                         alt={`Foto de ${membro.nome_completo}`}
                         className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
                       />
