@@ -118,7 +118,8 @@ export default function Relatorios() {
       titulo: "bold 52px 'Poppins', sans-serif",
       subtitulo: "500 28px 'Poppins', sans-serif",
       semana: "600 34px 'Poppins', sans-serif",
-      linha: "400 28px 'Poppins', sans-serif",
+      nome: "600 30px 'Poppins', sans-serif",
+      data: "400 26px 'Poppins', sans-serif",
       rodape: "400 24px 'Poppins', sans-serif",
     };
 
@@ -159,9 +160,11 @@ export default function Relatorios() {
 
       semana.membros.forEach((membro) => {
         const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
-        const textoLinha = `${membro.nome_completo} — ${format(dataNasc, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
-        const linhas = getWrappedLines(contexto, fontes.linha, textoLinha);
-        alturaConteudo += linhas.length * 34 + 8;
+        const nomeLinhas = getWrappedLines(contexto, fontes.nome, membro.nome_completo);
+        const dataLinha = format(dataNasc, "d 'de' MMMM", { locale: ptBR });
+        const dataLinhas = getWrappedLines(contexto, fontes.data, dataLinha);
+        alturaConteudo += nomeLinhas.length * 36;
+        alturaConteudo += dataLinhas.length * 30 + 10;
       });
 
       const linhasSubtitulo = getWrappedLines(contexto, fontes.subtitulo, `Mês de ${meses[mesSelecionado]}`);
@@ -223,24 +226,34 @@ export default function Relatorios() {
       });
 
       posicaoY += 8;
-      contexto.font = fontes.linha;
-      contexto.fillStyle = '#1F2937';
 
       semana.membros.forEach((membro) => {
         const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
-        const textoLinha = `${membro.nome_completo} — ${format(dataNasc, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
-        getWrappedLines(contexto, fontes.linha, textoLinha).forEach((linha) => {
+        contexto.font = fontes.nome;
+        contexto.fillStyle = '#111827';
+        getWrappedLines(contexto, fontes.nome, membro.nome_completo).forEach((linha) => {
           contexto.fillText(linha, padding, posicaoY);
-          posicaoY += 34;
+          posicaoY += 36;
         });
-        posicaoY += 6;
+        contexto.font = fontes.data;
+        contexto.fillStyle = '#4B5563';
+        const dataLinha = format(dataNasc, "d 'de' MMMM", { locale: ptBR });
+        getWrappedLines(contexto, fontes.data, dataLinha).forEach((linha) => {
+          contexto.fillText(linha, padding, posicaoY);
+          posicaoY += 30;
+        });
+        posicaoY += 10;
       });
 
       contexto.font = fontes.rodape;
       contexto.fillStyle = '#4C1D95';
+      let posicaoYRodape = alturaTotal - padding - linhasRodape.length * 28;
+      if (posicaoYRodape <= posicaoY + 16) {
+        posicaoYRodape = posicaoY + 16;
+      }
       linhasRodape.forEach((linha) => {
-        contexto.fillText(linha, padding, posicaoY);
-        posicaoY += 28;
+        contexto.fillText(linha, padding, posicaoYRodape);
+        posicaoYRodape += 28;
       });
 
       const link = document.createElement('a');
