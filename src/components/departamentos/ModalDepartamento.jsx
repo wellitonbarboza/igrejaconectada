@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
@@ -40,6 +40,7 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
   const [formData, setFormData] = useState(() =>
     departamento ? { ...defaultFormData, ...departamento } : defaultFormData
   );
+  const initializedRef = useRef(false);
 
   const { data: congregacoes = [] } = useQuery({
     queryKey: ['congregacoes'],
@@ -122,6 +123,28 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
   };
+
+  useEffect(() => {
+    initializedRef.current = false;
+  }, [departamento?.id]);
+
+  useEffect(() => {
+    if (!departamento || initializedRef.current) return;
+    const membrosIdsAtualizados = Array.isArray(departamento.membros_ids)
+      ? departamento.membros_ids
+      : [];
+    const membrosVinculados = membros
+      .filter((membro) => membro.departamento_id === departamento.id)
+      .map((membro) => membro.id);
+    const membrosUnicos = Array.from(new Set([...membrosIdsAtualizados, ...membrosVinculados]));
+    setFormData((prev) => ({
+      ...prev,
+      ...defaultFormData,
+      ...departamento,
+      membros_ids: membrosUnicos,
+    }));
+    initializedRef.current = true;
+  }, [departamento, membros, isAdmin, userCongregacaoId]);
 
   useEffect(() => {
     if (departamento) return;

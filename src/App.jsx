@@ -4,6 +4,8 @@ import Layout from './Layout.jsx';
 import Dashboard from '@/pages/Dashboard.jsx';
 import Membros from '@/pages/Membros.jsx';
 import DetalhesMembro from '@/pages/DetalhesMembro.jsx';
+import DetalhesCongregacao from '@/pages/DetalhesCongregacao.jsx';
+import DetalhesDepartamento from '@/pages/DetalhesDepartamento.jsx';
 import Departamentos from '@/pages/Departamentos.jsx';
 import Congregacoes from '@/pages/Congregacoes.jsx';
 import Relatorios from '@/pages/Relatorios.jsx';
@@ -52,6 +54,8 @@ export default function App() {
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
         <Route path={createPageUrl('Membros')} element={<Membros />} />
         <Route path={createPageUrl('DetalhesMembro')} element={<DetalhesMembro />} />
+        <Route path={createPageUrl('DetalhesCongregacao')} element={<DetalhesCongregacao />} />
+        <Route path={createPageUrl('DetalhesDepartamento')} element={<DetalhesDepartamento />} />
         <Route path={createPageUrl('Departamentos')} element={<Departamentos />} />
         <Route path={createPageUrl('Congregacoes')} element={<Congregacoes />} />
         <Route path={createPageUrl('Relatorios')} element={<Relatorios />} />

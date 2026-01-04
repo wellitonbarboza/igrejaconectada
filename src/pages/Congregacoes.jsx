@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import {
   Building2,
   Plus,
@@ -24,9 +26,11 @@ import {
 import ModalCongregacao from '@/components/congregacoes/ModalCongregacao.jsx';
 
 export default function Congregacoes() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [congregacaoSelecionada, setCongregacaoSelecionada] = useState(null);
+  const editHandledRef = useRef(false);
 
   const { data: congregacoes = [], isLoading } = useQuery({
     queryKey: ['congregacoes'],
@@ -47,9 +51,25 @@ export default function Congregacoes() {
     },
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') !== 'editar' || editHandledRef.current) return;
+    const congregacaoId = params.get('id');
+    if (!congregacaoId || congregacoes.length === 0) return;
+    const congregacao = congregacoes.find((item) => item.id === congregacaoId);
+    if (!congregacao) return;
+    setCongregacaoSelecionada(congregacao);
+    setShowModal(true);
+    editHandledRef.current = true;
+  }, [congregacoes]);
+
   const handleEdit = (congregacao) => {
     setCongregacaoSelecionada(congregacao);
     setShowModal(true);
+  };
+
+  const handleView = (congregacao) => {
+    navigate(`${createPageUrl('DetalhesCongregacao')}?id=${congregacao.id}`);
   };
 
   const handleDelete = async (id) => {
@@ -69,6 +89,10 @@ export default function Congregacoes() {
   const handleCloseModal = () => {
     setShowModal(false);
     setCongregacaoSelecionada(null);
+    const url = new URL(window.location);
+    url.searchParams.delete('action');
+    url.searchParams.delete('id');
+    window.history.replaceState({}, '', url);
   };
 
   const getMembrosPorCongregacao = (congregacaoId) =>
@@ -114,7 +138,11 @@ export default function Congregacoes() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {congregacoes.map((congregacao) => (
-              <Card key={congregacao.id} className="shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <Card
+                key={congregacao.id}
+                className="shadow-lg border-0 hover:shadow-xl transition-shadow cursor-pointer"
+                onClick={() => handleView(congregacao)}
+              >
                 <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-purple-50">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -128,16 +156,27 @@ export default function Congregacoes() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(congregacao)}>
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleEdit(congregacao);
+                          }}
+                        >
                           <Edit className="w-4 h-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(congregacao.id)} className="text-red-600">
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDelete(congregacao.id);
+                          }}
+                          className="text-red-600"
+                        >
                           <Trash2 className="w-4 h-4 mr-2" />
                           Excluir
                         </DropdownMenuItem>

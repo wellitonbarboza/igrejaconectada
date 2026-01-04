@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
@@ -52,6 +52,7 @@ export default function Membros() {
   const [congregacaoFiltro, setCongregacaoFiltro] = useState('todas');
   const [showModal, setShowModal] = useState(false);
   const [membroSelecionado, setMembroSelecionado] = useState(null);
+  const editHandledRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -73,6 +74,18 @@ export default function Membros() {
     queryFn: () => base44.entities.Congregacao.list('nome'),
     initialData: [],
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') !== 'editar' || editHandledRef.current) return;
+    const membroId = params.get('id');
+    if (!membroId || membros.length === 0) return;
+    const membro = membros.find((item) => item.id === membroId);
+    if (!membro) return;
+    setMembroSelecionado(membro);
+    setShowModal(true);
+    editHandledRef.current = true;
+  }, [membros]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Membro.delete(id),
@@ -122,6 +135,7 @@ export default function Membros() {
     setMembroSelecionado(null);
     const url = new URL(window.location);
     url.searchParams.delete('action');
+    url.searchParams.delete('id');
     window.history.replaceState({}, '', url);
   };
 
@@ -262,7 +276,11 @@ export default function Membros() {
                     </TableRow>
                   ) : (
                     filteredMembros.map((membro) => (
-                      <TableRow key={membro.id} className="hover:bg-slate-50">
+                      <TableRow
+                        key={membro.id}
+                        className="hover:bg-slate-50 cursor-pointer"
+                        onClick={() => handleView(membro)}
+                      >
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
@@ -300,21 +318,34 @@ export default function Membros() {
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleView(membro)}>
+                              <DropdownMenuItem
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleView(membro);
+                                }}
+                              >
                                 <Eye className="w-4 h-4 mr-2" />
                                 Visualizar
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEdit(membro)}>
+                              <DropdownMenuItem
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleEdit(membro);
+                                }}
+                              >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDelete(membro.id)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDelete(membro.id);
+                                }}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />

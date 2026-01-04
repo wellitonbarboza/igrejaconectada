@@ -79,7 +79,10 @@ export default function Dashboard() {
         (d) => !d.congregacao_id || d.congregacao_id === user?.congregacao_id
       );
 
-  const membrosAtivos = filteredMembros.filter((m) => m.ativo);
+  const membrosAtivos = filteredMembros.filter((m) => m.ativo || m.status === 'ativo');
+  const totalMembros = filteredMembros.length;
+  const congregacoesAtivas = congregacoes.filter((c) => c.ativa);
+  const departamentosAtivos = filteredDepartamentos.filter((d) => d.ativo);
   const membrosPorTipo = {
     membro: filteredMembros.filter((m) => m.tipo === 'membro').length,
     congregado: filteredMembros.filter((m) => m.tipo === 'congregado').length,
@@ -113,35 +116,35 @@ export default function Dashboard() {
   const stats = [
     {
       title: 'Total de Membros',
-      value: membrosAtivos.length,
+      value: totalMembros,
       icon: Users,
       color: 'from-blue-500 to-blue-600',
-      trend: '+12% este mês',
+      trend: `${membrosAtivos.length} ativos`,
     },
     ...(isAdmin
       ? [
           {
             title: 'Congregações',
-            value: congregacoes.filter((c) => c.ativa).length,
+            value: congregacoes.length,
             icon: Building2,
             color: 'from-purple-500 to-purple-600',
-            trend: `${congregacoes.length} total`,
+            trend: `${congregacoesAtivas.length} ativas`,
           },
         ]
       : []),
     {
       title: 'Departamentos',
-      value: filteredDepartamentos.filter((d) => d.ativo).length,
+      value: filteredDepartamentos.length,
       icon: GitBranch,
       color: 'from-green-500 to-green-600',
-      trend: 'Ativos',
+      trend: `${departamentosAtivos.length} ativos`,
     },
     {
       title: 'Aniversariantes',
       value: aniversariantesDoMes.length,
       icon: Cake,
       color: 'from-pink-500 to-pink-600',
-      trend: 'Este mês',
+      trend: `${aniversariantesDoMes.length} neste mês`,
     },
   ];
 
