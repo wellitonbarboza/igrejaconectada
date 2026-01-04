@@ -42,6 +42,11 @@ export default function ModalMembro({
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
   const didPrefillRef = useRef(false);
+  const uploadSessionIdRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
   const normalizeOrigem = (origemValue) => {
     if (origemValue === 'transferencia') return 'transferencia_recebe';
     return origemValue;
@@ -85,7 +90,7 @@ export default function ModalMembro({
     departamento_id: null,
     foto_url: '',
     foto_path: '',
-    foto_bucket: STORAGE_BUCKETS.avatares,
+    foto_bucket: STORAGE_BUCKETS.fotosMembros,
     observacoes: '',
     bairro: '',
     cidade_origem: '',
@@ -95,7 +100,10 @@ export default function ModalMembro({
   const resolveFotoUrl = (data) => {
     if (data?.foto_url) return data.foto_url;
     if (data?.foto_path) {
-      return buildStoragePublicUrl(data.foto_bucket || STORAGE_BUCKETS.avatares, data.foto_path);
+      return buildStoragePublicUrl(
+        data.foto_bucket || STORAGE_BUCKETS.fotosMembros,
+        data.foto_path
+      );
     }
     return '';
   };
@@ -106,7 +114,7 @@ export default function ModalMembro({
       ...defaultFormData,
       ...membro,
       foto_url: resolveFotoUrl(membro),
-      foto_bucket: membro.foto_bucket || STORAGE_BUCKETS.avatares,
+      foto_bucket: membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
       origem: normalizeOrigem(membro.origem || defaultFormData.origem),
       status: membro.status || defaultFormData.status,
     };
@@ -232,11 +240,11 @@ export default function ModalMembro({
     const fileToUpload = await compressImage(file, { maxSize: 800, quality: 0.8 });
     const extension = fileToUpload.name?.split('.').pop() || 'jpg';
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-    const pathPrefix = membro?.id ? `membros/${membro.id}` : 'membros/novo';
-    const filePath = `${pathPrefix}/${fileName}`;
+    const baseId = membro?.id || uploadSessionIdRef.current;
+    const filePath = `membros/${baseId}/fotos/${fileName}`;
     const { file_url } = await base44.integrations.Core.UploadFile({
       file: fileToUpload,
-      bucket: STORAGE_BUCKETS.avatares,
+      bucket: STORAGE_BUCKETS.fotosMembros,
       path: filePath,
     });
     return { file_url, filePath };
@@ -268,13 +276,13 @@ export default function ModalMembro({
           ...dataToSave,
           foto_url: file_url,
           foto_path: filePath,
-          foto_bucket: STORAGE_BUCKETS.avatares,
+          foto_bucket: STORAGE_BUCKETS.fotosMembros,
         };
         updateFormData((prev) => ({
           ...prev,
           foto_url: file_url,
           foto_path: filePath,
-          foto_bucket: STORAGE_BUCKETS.avatares,
+          foto_bucket: STORAGE_BUCKETS.fotosMembros,
         }));
         setPendingFotoFile(null);
         setPendingFotoPreview('');
@@ -575,15 +583,15 @@ export default function ModalMembro({
                         if (pendingFotoPreview) {
                           URL.revokeObjectURL(pendingFotoPreview);
                         }
-                        setPendingFotoFile(null);
-                        setPendingFotoPreview('');
-                        updateFormData((prev) => ({
-                          ...prev,
-                          foto_url: '',
-                          foto_path: '',
-                          foto_bucket: STORAGE_BUCKETS.avatares,
-                        }));
-                      }}
+                          setPendingFotoFile(null);
+                          setPendingFotoPreview('');
+                          updateFormData((prev) => ({
+                            ...prev,
+                            foto_url: '',
+                            foto_path: '',
+                            foto_bucket: STORAGE_BUCKETS.fotosMembros,
+                          }));
+                        }}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />

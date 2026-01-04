@@ -38,6 +38,7 @@ alter table storage.objects disable row level security;
 insert into storage.buckets (id, name, public)
 values
   ('avatares', 'avatares', true),
+  ('fotos-membros', 'fotos-membros', true),
   ('documentos', 'documentos', true)
 on conflict (id) do update
   set name = excluded.name,
