@@ -109,8 +109,8 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
     return null;
   }
 
-  const contentType = response.headers.get('Content-Type') || '';
-  if (contentType.includes('application/json')) {
+  const responseContentType = response.headers.get('Content-Type') || '';
+  if (responseContentType.includes('application/json')) {
     return response.json();
   }
   return response.text();
