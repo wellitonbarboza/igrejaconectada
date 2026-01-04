@@ -44,7 +44,14 @@ export default function DetalhesDepartamento() {
     );
   }
 
-  const membrosDoDepartamento = membros.filter((membro) => membro.departamento_id === departamento.id);
+  const membrosDoDepartamento = membros.filter((membro) => {
+    const departamentosIds = Array.isArray(membro.departamentos_ids)
+      ? membro.departamentos_ids
+      : membro.departamento_id
+      ? [membro.departamento_id]
+      : [];
+    return departamentosIds.includes(departamento.id);
+  });
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
