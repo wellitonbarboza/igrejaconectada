@@ -144,7 +144,7 @@ function createEntityClient(table) {
           Prefer: 'return=representation',
         },
         body: JSON.stringify(payload),
-        query: `?id=eq.${encodeURIComponent(id)}&select=*`,
+        query: `?id=eq.${encodeURIComponent(id)}`,
       });
     },
     async delete(id) {
