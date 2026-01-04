@@ -109,11 +109,6 @@ export default function Relatorios() {
   const handleDownloadImagem = () => {
     if (!aniversariantes.length) return;
 
-    const canvas = document.createElement('canvas');
-    const contexto = canvas.getContext('2d');
-
-    if (!contexto) return;
-
     const largura = 1080;
     const padding = 80;
     const larguraTexto = largura - padding * 2;
@@ -127,7 +122,7 @@ export default function Relatorios() {
       rodape: "400 24px 'Poppins', sans-serif",
     };
 
-    const getWrappedLines = (fonte, texto) => {
+    const getWrappedLines = (contexto, fonte, texto) => {
       contexto.font = fonte;
       const palavras = texto.split(' ');
       const linhas = [];
@@ -150,78 +145,79 @@ export default function Relatorios() {
       return linhas;
     };
 
-    let alturaConteudo = 0;
+    semanas.forEach((semana, index) => {
+      const canvas = document.createElement('canvas');
+      const contexto = canvas.getContext('2d');
 
-    semanas.forEach((semana) => {
-      const cabecalhoSemana = `Semana ${semana.indice} (${format(semana.inicio, 'dd/MM')} - ${format(semana.fim, 'dd/MM')})`;
-      const linhasSemana = getWrappedLines(fontes.semana, cabecalhoSemana);
+      if (!contexto) return;
+
+      const cabecalhoSemana = `${format(semana.inicio, 'dd/MM')} - ${format(semana.fim, 'dd/MM')}`;
+
+      let alturaConteudo = 0;
+      const linhasSemana = getWrappedLines(contexto, fontes.semana, cabecalhoSemana);
       alturaConteudo += linhasSemana.length * 42 + 16;
 
       semana.membros.forEach((membro) => {
         const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
         const textoLinha = `${membro.nome_completo} — ${format(dataNasc, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
-        const linhas = getWrappedLines(fontes.linha, textoLinha);
+        const linhas = getWrappedLines(contexto, fontes.linha, textoLinha);
         alturaConteudo += linhas.length * 34 + 8;
       });
 
-      alturaConteudo += 12;
-    });
+      const linhasSubtitulo = getWrappedLines(contexto, fontes.subtitulo, `Mês de ${meses[mesSelecionado]}`);
+      const linhasRodape = getWrappedLines(
+        contexto,
+        fontes.rodape,
+        'Que Deus continue abençoando as suas vidas. Somos Gratos por mais um ano estar conosco.',
+      );
 
-    const linhasSubtitulo = getWrappedLines(fontes.subtitulo, `Mês de ${meses[mesSelecionado]}`);
-    const linhasRodape = getWrappedLines(
-      fontes.rodape,
-      'Que Deus continue abençoando as suas vidas. Somos Gratos por mais um ano estar conosco.',
-    );
+      const alturaTotal =
+        padding +
+        70 +
+        linhasSubtitulo.length * 32 +
+        20 +
+        alturaConteudo +
+        linhasRodape.length * 28 +
+        padding;
 
-    const alturaTotal =
-      padding +
-      70 +
-      linhasSubtitulo.length * 32 +
-      20 +
-      alturaConteudo +
-      linhasRodape.length * 28 +
-      padding;
+      canvas.width = largura;
+      canvas.height = alturaTotal;
 
-    canvas.width = largura;
-    canvas.height = alturaTotal;
+      const gradiente = contexto.createLinearGradient(0, 0, largura, alturaTotal);
+      gradiente.addColorStop(0, '#FDE2E2');
+      gradiente.addColorStop(0.5, '#F4C4F3');
+      gradiente.addColorStop(1, '#C3CFE2');
 
-    const gradiente = contexto.createLinearGradient(0, 0, largura, alturaTotal);
-    gradiente.addColorStop(0, '#FDE2E2');
-    gradiente.addColorStop(0.5, '#F4C4F3');
-    gradiente.addColorStop(1, '#C3CFE2');
+      contexto.fillStyle = gradiente;
+      contexto.fillRect(0, 0, largura, alturaTotal);
 
-    contexto.fillStyle = gradiente;
-    contexto.fillRect(0, 0, largura, alturaTotal);
+      contexto.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      contexto.beginPath();
+      contexto.arc(largura - 140, 140, 120, 0, Math.PI * 2);
+      contexto.fill();
 
-    contexto.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    contexto.beginPath();
-    contexto.arc(largura - 140, 140, 120, 0, Math.PI * 2);
-    contexto.fill();
+      contexto.beginPath();
+      contexto.arc(120, alturaTotal - 160, 140, 0, Math.PI * 2);
+      contexto.fill();
 
-    contexto.beginPath();
-    contexto.arc(120, alturaTotal - 160, 140, 0, Math.PI * 2);
-    contexto.fill();
+      let posicaoY = padding;
 
-    let posicaoY = padding;
+      contexto.fillStyle = '#3B0764';
+      contexto.font = fontes.titulo;
+      contexto.fillText('Aniversariantes da Semana', padding, posicaoY);
 
-    contexto.fillStyle = '#3B0764';
-    contexto.font = fontes.titulo;
-    contexto.fillText('Aniversariantes da Semana', padding, posicaoY);
+      posicaoY += 70;
+      contexto.font = fontes.subtitulo;
+      linhasSubtitulo.forEach((linha) => {
+        contexto.fillText(linha, padding, posicaoY);
+        posicaoY += 32;
+      });
 
-    posicaoY += 70;
-    contexto.font = fontes.subtitulo;
-    linhasSubtitulo.forEach((linha) => {
-      contexto.fillText(linha, padding, posicaoY);
-      posicaoY += 32;
-    });
+      posicaoY += 20;
 
-    posicaoY += 20;
-
-    semanas.forEach((semana) => {
       contexto.font = fontes.semana;
       contexto.fillStyle = '#6B21A8';
-      const cabecalhoSemana = `Semana ${semana.indice} (${format(semana.inicio, 'dd/MM')} - ${format(semana.fim, 'dd/MM')})`;
-      getWrappedLines(fontes.semana, cabecalhoSemana).forEach((linha) => {
+      getWrappedLines(contexto, fontes.semana, cabecalhoSemana).forEach((linha) => {
         contexto.fillText(linha, padding, posicaoY);
         posicaoY += 42;
       });
@@ -233,27 +229,25 @@ export default function Relatorios() {
       semana.membros.forEach((membro) => {
         const dataNasc = new Date(`${membro.data_nascimento}T00:00:00`);
         const textoLinha = `${membro.nome_completo} — ${format(dataNasc, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
-        getWrappedLines(fontes.linha, textoLinha).forEach((linha) => {
+        getWrappedLines(contexto, fontes.linha, textoLinha).forEach((linha) => {
           contexto.fillText(linha, padding, posicaoY);
           posicaoY += 34;
         });
         posicaoY += 6;
       });
 
-      posicaoY += 12;
-    });
+      contexto.font = fontes.rodape;
+      contexto.fillStyle = '#4C1D95';
+      linhasRodape.forEach((linha) => {
+        contexto.fillText(linha, padding, posicaoY);
+        posicaoY += 28;
+      });
 
-    contexto.font = fontes.rodape;
-    contexto.fillStyle = '#4C1D95';
-    linhasRodape.forEach((linha) => {
-      contexto.fillText(linha, padding, posicaoY);
-      posicaoY += 28;
+      const link = document.createElement('a');
+      link.download = `aniversariantes-${meses[mesSelecionado].toLowerCase()}-semana-${index + 1}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
     });
-
-    const link = document.createElement('a');
-    link.download = `aniversariantes-${meses[mesSelecionado].toLowerCase()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
   };
 
   const handleDownloadPDF = () => {
