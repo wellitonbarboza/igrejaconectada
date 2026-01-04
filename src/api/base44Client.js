@@ -137,13 +137,14 @@ function createEntityClient(table) {
       });
     },
     async update(id, payload) {
+      const { id: _ignoredId, ...payloadWithoutId } = payload || {};
       return authenticatedRequest(`/rest/v1/${table}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Prefer: 'return=representation',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payloadWithoutId),
         query: `?id=eq.${encodeURIComponent(id)}`,
       });
     },
