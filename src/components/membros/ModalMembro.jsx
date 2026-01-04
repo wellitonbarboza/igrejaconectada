@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -32,7 +31,8 @@ export default function ModalMembro({
   const DRAFT_KEY = 'draft_membro';
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
-  const [compressEnabled, setCompressEnabled] = useState(true);
+  const [pendingFotoFile, setPendingFotoFile] = useState(null);
+  const [pendingFotoPreview, setPendingFotoPreview] = useState('');
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
@@ -221,41 +221,66 @@ export default function ModalMembro({
     },
   });
 
-  const handleFotoUpload = async (file) => {
+  const uploadFotoFile = async (file) => {
     if (!file) return;
 
-    setUploading(true);
-    try {
-      const fileToUpload = compressEnabled
-        ? await compressImage(file, { maxSize: 800, quality: 0.8 })
-        : file;
-      const extension = fileToUpload.name?.split('.').pop() || 'jpg';
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-      const pathPrefix = membro?.id ? `membros/${membro.id}` : 'membros/novo';
-      const filePath = `${pathPrefix}/${fileName}`;
-      const { file_url } = await base44.integrations.Core.UploadFile({
-        file: fileToUpload,
-        bucket: STORAGE_BUCKETS.avatares,
-        path: filePath,
-      });
-      handleChange('foto_url', file_url);
-      handleChange('foto_path', filePath);
-      handleChange('foto_bucket', STORAGE_BUCKETS.avatares);
-    } catch (error) {
-      console.error('Erro ao fazer upload da foto:', error);
-    }
-    setUploading(false);
+    const fileToUpload = await compressImage(file, { maxSize: 800, quality: 0.8 });
+    const extension = fileToUpload.name?.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+    const pathPrefix = membro?.id ? `membros/${membro.id}` : 'membros/novo';
+    const filePath = `${pathPrefix}/${fileName}`;
+    const { file_url } = await base44.integrations.Core.UploadFile({
+      file: fileToUpload,
+      bucket: STORAGE_BUCKETS.avatares,
+      path: filePath,
+    });
+    return { file_url, filePath };
   };
 
   const handleFotoFileChange = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    handleFotoUpload(file);
+    if (!file) return;
+    if (pendingFotoPreview) {
+      URL.revokeObjectURL(pendingFotoPreview);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setPendingFotoFile(file);
+    setPendingFotoPreview(previewUrl);
+    handleChange('foto_url', previewUrl);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    saveMutation.mutate(formData);
+    let dataToSave = formData;
+
+    if (pendingFotoFile) {
+      setUploading(true);
+      try {
+        const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
+        dataToSave = {
+          ...dataToSave,
+          foto_url: file_url,
+          foto_path: filePath,
+          foto_bucket: STORAGE_BUCKETS.avatares,
+        };
+        updateFormData((prev) => ({
+          ...prev,
+          foto_url: file_url,
+          foto_path: filePath,
+          foto_bucket: STORAGE_BUCKETS.avatares,
+        }));
+        setPendingFotoFile(null);
+        setPendingFotoPreview('');
+      } catch (error) {
+        console.error('Erro ao fazer upload da foto:', error);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
+    saveMutation.mutate(dataToSave);
   };
 
   const handleChange = (field, value) => {
@@ -380,6 +405,14 @@ export default function ModalMembro({
   }, [formData.origem, formData.status]);
 
   useEffect(() => {
+    return () => {
+      if (pendingFotoPreview) {
+        URL.revokeObjectURL(pendingFotoPreview);
+      }
+    };
+  }, [pendingFotoPreview]);
+
+  useEffect(() => {
     const cepDigits = (formData.cep || '').replace(/\D/g, '');
     if (cepDigits.length !== 8) {
       setCepStatus({ loading: false, error: '' });
@@ -446,14 +479,19 @@ export default function ModalMembro({
                     />
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        if (pendingFotoPreview) {
+                          URL.revokeObjectURL(pendingFotoPreview);
+                        }
+                        setPendingFotoFile(null);
+                        setPendingFotoPreview('');
                         updateFormData((prev) => ({
                           ...prev,
                           foto_url: '',
                           foto_path: '',
                           foto_bucket: STORAGE_BUCKETS.avatares,
-                        }))
-                      }
+                        }));
+                      }}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />
@@ -493,16 +531,6 @@ export default function ModalMembro({
                       <Camera className="w-4 h-4 mr-2" />
                       {uploading ? 'Enviando...' : 'Usar Câmera'}
                     </Button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <Checkbox
-                      id="compress-photo"
-                      checked={compressEnabled}
-                      onCheckedChange={(value) => setCompressEnabled(value === true)}
-                    />
-                    <Label htmlFor="compress-photo" className="text-sm">
-                      Comprimir imagem antes de enviar
-                    </Label>
                   </div>
                   <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG. Tamanho máximo: 5MB</p>
                 </div>
