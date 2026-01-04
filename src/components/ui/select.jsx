@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import clsx from 'clsx';
 import { ChevronDown } from 'lucide-react';
 
@@ -10,6 +10,28 @@ function getTextFromChildren(children) {
   if (Array.isArray(children)) return children.map(getTextFromChildren).join('');
   if (React.isValidElement(children)) return getTextFromChildren(children.props.children);
   return '';
+}
+
+function findLabelForValue(children, targetValue) {
+  let label = '';
+
+  React.Children.forEach(children, (child) => {
+    if (label || !React.isValidElement(child)) return;
+
+    if (child.type === SelectItem && child.props.value === targetValue) {
+      label = getTextFromChildren(child.props.children).trim();
+      return;
+    }
+
+    if (child.props?.children) {
+      const nestedLabel = findLabelForValue(child.props.children, targetValue);
+      if (nestedLabel) {
+        label = nestedLabel;
+      }
+    }
+  });
+
+  return label;
 }
 
 export function Select({ children, value, defaultValue, onValueChange, disabled }) {
@@ -28,6 +50,20 @@ export function Select({ children, value, defaultValue, onValueChange, disabled 
   };
 
   const currentValue = value !== undefined ? value : internalValue;
+
+  useEffect(() => {
+    if (!currentValue) {
+      if (selectedLabel) {
+        setSelectedLabel('');
+      }
+      return;
+    }
+
+    const label = findLabelForValue(children, currentValue);
+    if (label && label !== selectedLabel) {
+      setSelectedLabel(label);
+    }
+  }, [children, currentValue, selectedLabel]);
 
   const contextValue = useMemo(
     () => ({
