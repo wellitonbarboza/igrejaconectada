@@ -2,13 +2,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'documentos';
+const ADMIN_USER_ID =
+  import.meta.env.VITE_SUPABASE_ADMIN_USER_ID || '00000000-0000-0000-0000-000000000001';
 export const STORAGE_BUCKETS = {
   documentos: 'documentos',
   avatares: 'avatares',
+  fotosMembros: 'fotos-membros',
 };
 
 const ADMIN_PROFILE = {
-  id: '00000000-0000-0000-0000-000000000001',
+  id: ADMIN_USER_ID,
   full_name: 'Administrador Geral',
   email: 'admin@igreja.local',
   role: 'admin',
@@ -28,6 +31,10 @@ function getAdminAuthToken() {
 
 function getAdminApiKey() {
   return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+}
+
+function isPlaceholderAdminId(id) {
+  return id === '00000000-0000-0000-0000-000000000001';
 }
 
 async function fetchAuthAdminUser(id) {
@@ -154,6 +161,9 @@ async function ensureAdminProfile() {
   if (!SUPABASE_SERVICE_ROLE_KEY) {
     return { ...ADMIN_PROFILE };
   }
+  if (isPlaceholderAdminId(ADMIN_PROFILE.id)) {
+    return { ...ADMIN_PROFILE };
+  }
   const adminUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
   if (!adminUser) {
     return { ...ADMIN_PROFILE };
@@ -202,7 +212,7 @@ export const base44 = {
   },
   integrations: {
     Core: {
-      async UploadFile({ file, bucket = STORAGE_BUCKET }) {
+      async UploadFile({ file, bucket = STORAGE_BUCKET, path }) {
         assertSupabaseEnv();
         if (!file) {
           throw new Error('Nenhum arquivo selecionado');
@@ -210,13 +220,20 @@ export const base44 = {
         const authToken = getAdminAuthToken();
         const apiKey = getAdminApiKey();
         const extension = file.name?.split('.').pop() || 'bin';
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
-          method: 'POST',
+        const fileName =
+          path ||
+          `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+        const encodedPath = fileName
+          .split('/')
+          .map((segment) => encodeURIComponent(segment))
+          .join('/');
+        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodedPath}`, {
+          method: 'PUT',
           headers: {
             apikey: apiKey,
             Authorization: `Bearer ${authToken}`,
             'Content-Type': file.type || 'application/octet-stream',
+            'x-upsert': 'true',
           },
           body: file,
         });
@@ -229,11 +246,20 @@ export const base44 = {
           throw new Error(text || 'Erro ao enviar arquivo');
         }
 
-        const file_url = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${fileName}`;
+        const file_url = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodedPath}`;
         return { file_url, path: fileName };
       },
     },
   },
+};
+
+export const buildStoragePublicUrl = (bucket, path) => {
+  if (!SUPABASE_URL || !bucket || !path) return '';
+  const encodedPath = path
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodedPath}`;
 };
 
 export default base44;

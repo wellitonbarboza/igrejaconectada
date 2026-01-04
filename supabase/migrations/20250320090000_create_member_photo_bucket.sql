@@ -1,8 +1,9 @@
 insert into storage.buckets (id, name, public)
 values
-  ('avatares', 'avatares', true),
-  ('fotos-membros', 'fotos-membros', true),
-  ('documentos', 'documentos', true)
+  ('fotos-membros', 'fotos-membros', true)
 on conflict (id) do update
   set name = excluded.name,
       public = excluded.public;
+
+alter table public.membros
+  alter column foto_bucket set default 'fotos-membros';

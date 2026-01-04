@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { compressImage } from '@/utils/imageCompression';
+import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -32,10 +33,21 @@ export default function ModalMembro({
   const DRAFT_KEY = 'draft_membro';
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [pendingFotoFile, setPendingFotoFile] = useState(null);
+  const [pendingFotoPreview, setPendingFotoPreview] = useState('');
+  const [rawFotoFile, setRawFotoFile] = useState(null);
+  const [rawFotoPreview, setRawFotoPreview] = useState('');
+  const [fotoEditorOpen, setFotoEditorOpen] = useState(false);
+  const [fotoEditorZoom, setFotoEditorZoom] = useState(1);
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
   const didPrefillRef = useRef(false);
+  const uploadSessionIdRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
   const normalizeOrigem = (origemValue) => {
     if (origemValue === 'transferencia') return 'transferencia_recebe';
     return origemValue;
@@ -79,6 +91,8 @@ export default function ModalMembro({
     departamento_id: null,
     departamentos_ids: [],
     foto_url: '',
+    foto_path: '',
+    foto_bucket: STORAGE_BUCKETS.fotosMembros,
     observacoes: '',
     bairro: '',
     cidade_origem: '',
@@ -128,7 +142,14 @@ export default function ModalMembro({
       'data_obreiro',
     ];
     const uuidFields = ['congregacao_id', 'departamento_id'];
+    const optionalFields = ['foto_url', 'foto_path', 'foto_bucket'];
     const payload = { ...data };
+
+    optionalFields.forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
 
     uuidFields.forEach((field) => {
       if (payload[field] === '') {
@@ -216,27 +237,67 @@ export default function ModalMembro({
     },
   });
 
-  const handleFotoUpload = async (event) => {
-    const file = event.target.files?.[0];
+  const uploadFotoFile = async (file) => {
     if (!file) return;
 
-    setUploading(true);
-    try {
-      const compressedFile = await compressImage(file, { maxSize: 800, quality: 0.8 });
-      const { file_url } = await base44.integrations.Core.UploadFile({
-        file: compressedFile,
-        bucket: STORAGE_BUCKETS.avatares,
-      });
-      handleChange('foto_url', file_url);
-    } catch (error) {
-      console.error('Erro ao fazer upload da foto:', error);
-    }
-    setUploading(false);
+    const fileToUpload = await compressImage(file, { maxSize: 800, quality: 0.8 });
+    const extension = fileToUpload.name?.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+    const baseId = membro?.id || uploadSessionIdRef.current;
+    const filePath = `membros/${baseId}/fotos/${fileName}`;
+    const { file_url, path } = await base44.integrations.Core.UploadFile({
+      file: fileToUpload,
+      bucket: STORAGE_BUCKETS.fotosMembros,
+      path: filePath,
+    });
+    return { file_url, filePath: path || filePath };
   };
 
-  const handleSubmit = (event) => {
+  const handleFotoFileChange = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (rawFotoPreview) {
+      URL.revokeObjectURL(rawFotoPreview);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setRawFotoFile(file);
+    setRawFotoPreview(previewUrl);
+    setFotoEditorZoom(1);
+    setFotoEditorOpen(true);
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    saveMutation.mutate(formData);
+    let dataToSave = formData;
+
+    if (pendingFotoFile) {
+      setUploading(true);
+      try {
+        const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
+        dataToSave = {
+          ...dataToSave,
+          foto_url: file_url,
+          foto_path: filePath,
+          foto_bucket: STORAGE_BUCKETS.fotosMembros,
+        };
+        updateFormData((prev) => ({
+          ...prev,
+          foto_url: file_url,
+          foto_path: filePath,
+          foto_bucket: STORAGE_BUCKETS.fotosMembros,
+        }));
+        setPendingFotoFile(null);
+        setPendingFotoPreview('');
+      } catch (error) {
+        console.error('Erro ao fazer upload da foto:', error);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
+    saveMutation.mutate(dataToSave);
   };
 
   const handleChange = (field, value) => {
@@ -374,6 +435,99 @@ export default function ModalMembro({
   }, [formData.origem, formData.status]);
 
   useEffect(() => {
+    return () => {
+      if (pendingFotoPreview) {
+        URL.revokeObjectURL(pendingFotoPreview);
+      }
+      if (rawFotoPreview) {
+        URL.revokeObjectURL(rawFotoPreview);
+      }
+    };
+  }, [pendingFotoPreview, rawFotoPreview]);
+
+  const createEditedFotoFile = (file, zoom) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = reject;
+        image.onload = () => {
+          const size = 512;
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const context = canvas.getContext('2d');
+          if (!context) {
+            reject(new Error('Não foi possível preparar o editor de imagem.'));
+            return;
+          }
+
+          const scale = Math.max(size / image.width, size / image.height) * zoom;
+          const scaledWidth = image.width * scale;
+          const scaledHeight = image.height * scale;
+          const offsetX = (size - scaledWidth) / 2;
+          const offsetY = (size - scaledHeight) / 2;
+
+          context.fillStyle = '#ffffff';
+          context.fillRect(0, 0, size, size);
+          context.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Não foi possível gerar a imagem editada.'));
+                return;
+              }
+              const extension = file.name?.split('.').pop() || 'jpg';
+              const editedFile = new File([blob], `foto-editada.${extension}`, {
+                type: blob.type,
+              });
+              resolve(editedFile);
+            },
+            'image/jpeg',
+            0.9
+          );
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handleConfirmFotoEdit = async () => {
+    if (!rawFotoFile) return;
+    try {
+      const editedFile = await createEditedFotoFile(rawFotoFile, fotoEditorZoom);
+      if (pendingFotoPreview) {
+        URL.revokeObjectURL(pendingFotoPreview);
+      }
+      const previewUrl = URL.createObjectURL(editedFile);
+      setPendingFotoFile(editedFile);
+      setPendingFotoPreview(previewUrl);
+      setFotoEditorOpen(false);
+      setRawFotoFile(null);
+      if (rawFotoPreview) {
+        URL.revokeObjectURL(rawFotoPreview);
+      }
+      setRawFotoPreview('');
+    } catch (error) {
+      console.error('Erro ao preparar a foto:', error);
+    }
+  };
+
+  const handleCancelFotoEdit = () => {
+    setFotoEditorOpen(false);
+    setRawFotoFile(null);
+    if (rawFotoPreview) {
+      URL.revokeObjectURL(rawFotoPreview);
+    }
+    setRawFotoPreview('');
+    setFotoEditorZoom(1);
+  };
+
+  const fotoPreview = pendingFotoPreview || formData.foto_url;
+
+  useEffect(() => {
     const cepDigits = (formData.cep || '').replace(/\D/g, '');
     if (cepDigits.length !== 8) {
       setCepStatus({ loading: false, error: '' });
@@ -418,29 +572,42 @@ export default function ModalMembro({
       );
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">
-            {membro ? 'Editar Membro' : 'Novo Membro'}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              {membro ? 'Editar Membro' : 'Novo Membro'}
+            </DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
+          <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label>Foto do Membro</Label>
               <div className="mt-2 flex items-center gap-4">
-                {formData.foto_url ? (
+                {fotoPreview ? (
                   <div className="relative">
                     <img
-                      src={formData.foto_url}
+                      src={fotoPreview}
                       alt="Foto"
                       className="w-24 h-24 rounded-full object-cover border-2 border-slate-200"
                     />
                     <button
                       type="button"
-                      onClick={() => handleChange('foto_url', '')}
+                      onClick={() => {
+                        if (pendingFotoPreview) {
+                          URL.revokeObjectURL(pendingFotoPreview);
+                        }
+                          setPendingFotoFile(null);
+                          setPendingFotoPreview('');
+                          updateFormData((prev) => ({
+                            ...prev,
+                            foto_url: '',
+                            foto_path: '',
+                            foto_bucket: STORAGE_BUCKETS.fotosMembros,
+                          }));
+                        }}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />
@@ -452,11 +619,35 @@ export default function ModalMembro({
                   </div>
                 )}
                 <div className="flex-1">
-                  <input id="foto" type="file" accept="image/*" onChange={handleFotoUpload} className="hidden" />
-                  <Button type="button" variant="outline" onClick={() => document.getElementById('foto').click()} disabled={uploading}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    {uploading ? 'Enviando...' : 'Escolher Foto'}
-                  </Button>
+                  <input id="foto-upload" type="file" accept="image/*" onChange={handleFotoFileChange} className="hidden" />
+                  <input
+                    id="foto-camera"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFotoFileChange}
+                    className="hidden"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('foto-upload').click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploading ? 'Enviando...' : 'Carregar Arquivo'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('foto-camera').click()}
+                      disabled={uploading}
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      {uploading ? 'Enviando...' : 'Usar Câmera'}
+                    </Button>
+                  </div>
                   <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG. Tamanho máximo: 5MB</p>
                 </div>
               </div>
@@ -1158,8 +1349,66 @@ export default function ModalMembro({
               {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={fotoEditorOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancelFotoEdit();
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Pré-visualizar e editar foto</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              {rawFotoPreview ? (
+                <div className="w-64 h-64 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                  <img
+                    src={rawFotoPreview}
+                    alt="Pré-visualização da foto"
+                    className="w-full h-full object-cover"
+                    style={{ transform: `scale(${fotoEditorZoom})` }}
+                  />
+                </div>
+              ) : (
+                <div className="w-64 h-64 rounded-xl border border-dashed border-slate-300 flex items-center justify-center text-sm text-slate-500">
+                  Nenhuma imagem selecionada
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="foto-zoom">Zoom</Label>
+              <input
+                id="foto-zoom"
+                type="range"
+                min="1"
+                max="2.5"
+                step="0.1"
+                value={fotoEditorZoom}
+                onChange={(event) => setFotoEditorZoom(Number(event.target.value))}
+                className="w-full"
+              />
+              <div className="text-xs text-slate-500">Ajuste o enquadramento antes de salvar.</div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleCancelFotoEdit}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleConfirmFotoEdit} disabled={!rawFotoFile}>
+                Aplicar foto
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
