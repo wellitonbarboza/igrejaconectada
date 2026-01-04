@@ -202,7 +202,7 @@ export const base44 = {
   },
   integrations: {
     Core: {
-      async UploadFile({ file, bucket = STORAGE_BUCKET }) {
+      async UploadFile({ file, bucket = STORAGE_BUCKET, path }) {
         assertSupabaseEnv();
         if (!file) {
           throw new Error('Nenhum arquivo selecionado');
@@ -210,7 +210,9 @@ export const base44 = {
         const authToken = getAdminAuthToken();
         const apiKey = getAdminApiKey();
         const extension = file.name?.split('.').pop() || 'bin';
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+        const fileName =
+          path ||
+          `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
         const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
           method: 'POST',
           headers: {
@@ -234,6 +236,11 @@ export const base44 = {
       },
     },
   },
+};
+
+export const buildStoragePublicUrl = (bucket, path) => {
+  if (!SUPABASE_URL || !bucket || !path) return '';
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
 };
 
 export default base44;

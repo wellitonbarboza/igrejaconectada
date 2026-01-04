@@ -1,5 +1,5 @@
 import React from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS, buildStoragePublicUrl } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -55,6 +55,10 @@ export default function DetalhesMembro() {
     );
   }
 
+  const fotoUrl =
+    membro.foto_url ||
+    buildStoragePublicUrl(membro.foto_bucket || STORAGE_BUCKETS.avatares, membro.foto_path);
+
   const getTipoBadgeColor = (tipo) => {
     const colors = {
       membro: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -109,9 +113,17 @@ export default function DetalhesMembro() {
         <Card className="shadow-lg border-0">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-4xl">{membro.nome_completo?.charAt(0)}</span>
-              </div>
+              {fotoUrl ? (
+                <img
+                  src={fotoUrl}
+                  alt={`Foto de ${membro.nome_completo}`}
+                  className="w-24 h-24 rounded-full object-cover shadow-lg border-2 border-white"
+                />
+              ) : (
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-4xl">{membro.nome_completo?.charAt(0)}</span>
+                </div>
+              )}
               <div className="flex-1">
                 <CardTitle className="text-2xl">{membro.nome_completo}</CardTitle>
                 <div className="flex gap-2 mt-2 flex-wrap">

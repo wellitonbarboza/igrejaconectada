@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS, buildStoragePublicUrl } from '@/api/base44Client';
 import { compressImage } from '@/utils/imageCompression';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
@@ -32,6 +32,7 @@ export default function ModalMembro({
   const DRAFT_KEY = 'draft_membro';
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [compressEnabled, setCompressEnabled] = useState(true);
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
@@ -78,22 +79,35 @@ export default function ModalMembro({
     data_obreiro: '',
     departamento_id: null,
     foto_url: '',
+    foto_path: '',
+    foto_bucket: STORAGE_BUCKETS.avatares,
     observacoes: '',
     bairro: '',
     cidade_origem: '',
     cidade_destino: '',
     ativo: true,
   };
-  const [formData, setFormData] = useState(() =>
-    membro
-      ? {
-          ...defaultFormData,
-          ...membro,
-          origem: normalizeOrigem(membro.origem || defaultFormData.origem),
-          status: membro.status || defaultFormData.status,
-        }
-      : defaultFormData
-  );
+  const resolveFotoUrl = (data) => {
+    if (data?.foto_url) return data.foto_url;
+    if (data?.foto_path) {
+      return buildStoragePublicUrl(data.foto_bucket || STORAGE_BUCKETS.avatares, data.foto_path);
+    }
+    return '';
+  };
+
+  const buildInitialFormData = () => {
+    if (!membro) return defaultFormData;
+    return {
+      ...defaultFormData,
+      ...membro,
+      foto_url: resolveFotoUrl(membro),
+      foto_bucket: membro.foto_bucket || STORAGE_BUCKETS.avatares,
+      origem: normalizeOrigem(membro.origem || defaultFormData.origem),
+      status: membro.status || defaultFormData.status,
+    };
+  };
+
+  const [formData, setFormData] = useState(buildInitialFormData);
   const updateFormData = (updater) => {
     setFormData((prev) => {
       const nextValue = typeof updater === 'function' ? updater(prev) : updater;
@@ -125,7 +139,14 @@ export default function ModalMembro({
       'data_obreiro',
     ];
     const uuidFields = ['congregacao_id', 'departamento_id'];
+    const optionalFields = ['foto_url', 'foto_path', 'foto_bucket'];
     const payload = { ...data };
+
+    optionalFields.forEach((field) => {
+      if (payload[field] === '') {
+        payload[field] = null;
+      }
+    });
 
     uuidFields.forEach((field) => {
       if (payload[field] === '') {
@@ -200,22 +221,36 @@ export default function ModalMembro({
     },
   });
 
-  const handleFotoUpload = async (event) => {
-    const file = event.target.files?.[0];
+  const handleFotoUpload = async (file) => {
     if (!file) return;
 
     setUploading(true);
     try {
-      const compressedFile = await compressImage(file, { maxSize: 800, quality: 0.8 });
+      const fileToUpload = compressEnabled
+        ? await compressImage(file, { maxSize: 800, quality: 0.8 })
+        : file;
+      const extension = fileToUpload.name?.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+      const pathPrefix = membro?.id ? `membros/${membro.id}` : 'membros/novo';
+      const filePath = `${pathPrefix}/${fileName}`;
       const { file_url } = await base44.integrations.Core.UploadFile({
-        file: compressedFile,
+        file: fileToUpload,
         bucket: STORAGE_BUCKETS.avatares,
+        path: filePath,
       });
       handleChange('foto_url', file_url);
+      handleChange('foto_path', filePath);
+      handleChange('foto_bucket', STORAGE_BUCKETS.avatares);
     } catch (error) {
       console.error('Erro ao fazer upload da foto:', error);
     }
     setUploading(false);
+  };
+
+  const handleFotoFileChange = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    handleFotoUpload(file);
   };
 
   const handleSubmit = (event) => {
@@ -411,7 +446,14 @@ export default function ModalMembro({
                     />
                     <button
                       type="button"
-                      onClick={() => handleChange('foto_url', '')}
+                      onClick={() =>
+                        updateFormData((prev) => ({
+                          ...prev,
+                          foto_url: '',
+                          foto_path: '',
+                          foto_bucket: STORAGE_BUCKETS.avatares,
+                        }))
+                      }
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />
@@ -423,11 +465,45 @@ export default function ModalMembro({
                   </div>
                 )}
                 <div className="flex-1">
-                  <input id="foto" type="file" accept="image/*" onChange={handleFotoUpload} className="hidden" />
-                  <Button type="button" variant="outline" onClick={() => document.getElementById('foto').click()} disabled={uploading}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    {uploading ? 'Enviando...' : 'Escolher Foto'}
-                  </Button>
+                  <input id="foto-upload" type="file" accept="image/*" onChange={handleFotoFileChange} className="hidden" />
+                  <input
+                    id="foto-camera"
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFotoFileChange}
+                    className="hidden"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('foto-upload').click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploading ? 'Enviando...' : 'Carregar Arquivo'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('foto-camera').click()}
+                      disabled={uploading}
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      {uploading ? 'Enviando...' : 'Usar Câmera'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Checkbox
+                      id="compress-photo"
+                      checked={compressEnabled}
+                      onCheckedChange={(value) => setCompressEnabled(value === true)}
+                    />
+                    <Label htmlFor="compress-photo" className="text-sm">
+                      Comprimir imagem antes de enviar
+                    </Label>
+                  </div>
                   <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG. Tamanho máximo: 5MB</p>
                 </div>
               </div>
