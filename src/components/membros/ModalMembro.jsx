@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { base44, STORAGE_BUCKETS, buildStoragePublicUrl } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { compressImage } from '@/utils/imageCompression';
+import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -97,16 +98,7 @@ export default function ModalMembro({
     cidade_destino: '',
     ativo: true,
   };
-  const resolveFotoUrl = (data) => {
-    if (data?.foto_url) return data.foto_url;
-    if (data?.foto_path) {
-      return buildStoragePublicUrl(
-        data.foto_bucket || STORAGE_BUCKETS.fotosMembros,
-        data.foto_path
-      );
-    }
-    return '';
-  };
+  const resolveFotoUrl = (data) => resolveMemberPhotoUrl(data);
 
   const buildInitialFormData = () => {
     if (!membro) return defaultFormData;
@@ -242,12 +234,12 @@ export default function ModalMembro({
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
     const baseId = membro?.id || uploadSessionIdRef.current;
     const filePath = `membros/${baseId}/fotos/${fileName}`;
-    const { file_url } = await base44.integrations.Core.UploadFile({
+    const { file_url, path } = await base44.integrations.Core.UploadFile({
       file: fileToUpload,
       bucket: STORAGE_BUCKETS.fotosMembros,
       path: filePath,
     });
-    return { file_url, filePath };
+    return { file_url, filePath: path || filePath };
   };
 
   const handleFotoFileChange = (event) => {

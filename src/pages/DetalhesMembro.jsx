@@ -1,5 +1,6 @@
 import React from 'react';
-import { base44, STORAGE_BUCKETS, buildStoragePublicUrl } from '@/api/base44Client';
+import { base44 } from '@/api/base44Client';
+import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -55,12 +56,7 @@ export default function DetalhesMembro() {
     );
   }
 
-  const fotoUrl =
-    membro.foto_url ||
-    buildStoragePublicUrl(
-      membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
-      membro.foto_path
-    );
+  const fotoUrl = resolveMemberPhotoUrl(membro);
 
   const getTipoBadgeColor = (tipo) => {
     const colors = {
