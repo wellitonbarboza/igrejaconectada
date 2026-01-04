@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { base44, STORAGE_BUCKETS, buildStoragePublicUrl } from '@/api/base44Client';
+import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Search, Download, Calendar, Hash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
 import churchLogo from '@/assets/church-logo.svg';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
+import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import ieadLogo from '@/assets/iead-logo.svg';
 
 
@@ -58,12 +59,7 @@ export default function Cartoes() {
     window.print();
   };
 
-  const resolveFotoUrl = (membro) =>
-    membro.foto_url ||
-    buildStoragePublicUrl(
-      membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
-      membro.foto_path
-    );
+  const resolveFotoUrl = (membro) => resolveMemberPhotoUrl(membro);
 
   const CartaoMembro = ({ membro }) => (
     <div className="w-[350px] h-[220px] bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden print:break-inside-avoid print:mb-4">
