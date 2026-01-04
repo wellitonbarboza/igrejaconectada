@@ -222,12 +222,17 @@ export const base44 = {
         const fileName =
           path ||
           `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
-          method: 'POST',
+        const encodedPath = fileName
+          .split('/')
+          .map((segment) => encodeURIComponent(segment))
+          .join('/');
+        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodedPath}`, {
+          method: 'PUT',
           headers: {
             apikey: apiKey,
             Authorization: `Bearer ${authToken}`,
             'Content-Type': file.type || 'application/octet-stream',
+            'x-upsert': 'true',
           },
           body: file,
         });
@@ -240,7 +245,7 @@ export const base44 = {
           throw new Error(text || 'Erro ao enviar arquivo');
         }
 
-        const file_url = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${fileName}`;
+        const file_url = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodedPath}`;
         return { file_url, path: fileName };
       },
     },
@@ -249,7 +254,11 @@ export const base44 = {
 
 export const buildStoragePublicUrl = (bucket, path) => {
   if (!SUPABASE_URL || !bucket || !path) return '';
-  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+  const encodedPath = path
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodedPath}`;
 };
 
 export default base44;
