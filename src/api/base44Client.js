@@ -2,13 +2,15 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'documentos';
+const ADMIN_USER_ID =
+  import.meta.env.VITE_SUPABASE_ADMIN_USER_ID || '00000000-0000-0000-0000-000000000001';
 export const STORAGE_BUCKETS = {
   documentos: 'documentos',
   avatares: 'avatares',
 };
 
 const ADMIN_PROFILE = {
-  id: '00000000-0000-0000-0000-000000000001',
+  id: ADMIN_USER_ID,
   full_name: 'Administrador Geral',
   email: 'admin@igreja.local',
   role: 'admin',
@@ -28,6 +30,10 @@ function getAdminAuthToken() {
 
 function getAdminApiKey() {
   return SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+}
+
+function isPlaceholderAdminId(id) {
+  return id === '00000000-0000-0000-0000-000000000001';
 }
 
 async function fetchAuthAdminUser(id) {
@@ -152,6 +158,9 @@ function createEntityClient(table) {
 async function ensureAdminProfile() {
   if (!ADMIN_PROFILE?.id) return null;
   if (!SUPABASE_SERVICE_ROLE_KEY) {
+    return { ...ADMIN_PROFILE };
+  }
+  if (isPlaceholderAdminId(ADMIN_PROFILE.id)) {
     return { ...ADMIN_PROFILE };
   }
   const adminUser = await fetchAuthAdminUser(ADMIN_PROFILE.id);
