@@ -60,7 +60,10 @@ export default function Cartoes() {
 
   const resolveFotoUrl = (membro) =>
     membro.foto_url ||
-    buildStoragePublicUrl(membro.foto_bucket || STORAGE_BUCKETS.avatares, membro.foto_path);
+    buildStoragePublicUrl(
+      membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
+      membro.foto_path
+    );
 
   const CartaoMembro = ({ membro }) => (
     <div className="w-[350px] h-[220px] bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden print:break-inside-avoid print:mb-4">

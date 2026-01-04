@@ -7,6 +7,7 @@ const ADMIN_USER_ID =
 export const STORAGE_BUCKETS = {
   documentos: 'documentos',
   avatares: 'avatares',
+  fotosMembros: 'fotos-membros',
 };
 
 const ADMIN_PROFILE = {

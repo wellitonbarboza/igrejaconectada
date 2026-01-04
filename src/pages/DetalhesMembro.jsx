@@ -57,7 +57,10 @@ export default function DetalhesMembro() {
 
   const fotoUrl =
     membro.foto_url ||
-    buildStoragePublicUrl(membro.foto_bucket || STORAGE_BUCKETS.avatares, membro.foto_path);
+    buildStoragePublicUrl(
+      membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
+      membro.foto_path
+    );
 
   const getTipoBadgeColor = (tipo) => {
     const colors = {
