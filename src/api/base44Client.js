@@ -72,6 +72,13 @@ function buildUnauthorizedMessage(details) {
   );
 }
 
+function sanitizePayload(payload) {
+  if (!payload || typeof payload !== 'object' || payload instanceof FormData) {
+    return payload;
+  }
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+}
+
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
   const authToken = getAdminAuthToken();
@@ -135,25 +142,27 @@ function createEntityClient(table) {
       return Array.isArray(data) ? data[0] : data;
     },
     async create(payload) {
+      const sanitizedPayload = sanitizePayload(payload);
       return authenticatedRequest(`/rest/v1/${table}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Prefer: 'return=representation',
         },
-        body: JSON.stringify(payload),
+        body: sanitizedPayload,
         query: '?select=*',
       });
     },
     async update(id, payload) {
       const { id: _ignoredId, ...payloadWithoutId } = payload || {};
+      const sanitizedPayload = sanitizePayload(payloadWithoutId);
       return authenticatedRequest(`/rest/v1/${table}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Prefer: 'return=representation',
         },
-        body: JSON.stringify(payloadWithoutId),
+        body: sanitizedPayload,
         query: `?id=eq.${encodeURIComponent(id)}`,
       });
     },
