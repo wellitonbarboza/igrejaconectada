@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { GitBranch, Plus, Users, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,10 +17,12 @@ import ModalDepartamento from '@/components/departamentos/ModalDepartamento.jsx'
 import { useAuth } from '@/context/AuthContext.jsx';
 
 export default function Departamentos() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [departamentoSelecionado, setDepartamentoSelecionado] = useState(null);
+  const editHandledRef = useRef(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -40,6 +44,18 @@ export default function Departamentos() {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') !== 'editar' || editHandledRef.current) return;
+    const departamentoId = params.get('id');
+    if (!departamentoId || departamentos.length === 0) return;
+    const departamento = departamentos.find((item) => item.id === departamentoId);
+    if (!departamento) return;
+    setDepartamentoSelecionado(departamento);
+    setShowModal(true);
+    editHandledRef.current = true;
+  }, [departamentos]);
 
   const filteredDepartamentos = isAdmin
     ? departamentos
@@ -64,6 +80,10 @@ export default function Departamentos() {
     setShowModal(true);
   };
 
+  const handleView = (departamento) => {
+    navigate(`${createPageUrl('DetalhesDepartamento')}?id=${departamento.id}`);
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este departamento?')) {
       await deleteMutation.mutateAsync(id);
@@ -73,6 +93,10 @@ export default function Departamentos() {
   const handleCloseModal = () => {
     setShowModal(false);
     setDepartamentoSelecionado(null);
+    const url = new URL(window.location);
+    url.searchParams.delete('action');
+    url.searchParams.delete('id');
+    window.history.replaceState({}, '', url);
   };
 
   return (
@@ -115,7 +139,11 @@ export default function Departamentos() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDepartamentos.map((departamento) => (
-              <Card key={departamento.id} className="shadow-lg border-0 hover:shadow-xl transition-shadow">
+              <Card
+                key={departamento.id}
+                className="shadow-lg border-0 hover:shadow-xl transition-shadow cursor-pointer"
+                onClick={() => handleView(departamento)}
+              >
                 <CardHeader className="border-b" style={{ backgroundColor: `${departamento.cor || '#3b82f6'}15` }}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -126,16 +154,27 @@ export default function Departamentos() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(departamento)}>
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleEdit(departamento);
+                          }}
+                        >
                           <Edit className="w-4 h-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(departamento.id)} className="text-red-600">
+                        <DropdownMenuItem
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDelete(departamento.id);
+                          }}
+                          className="text-red-600"
+                        >
                           <Trash2 className="w-4 h-4 mr-2" />
                           Excluir
                         </DropdownMenuItem>

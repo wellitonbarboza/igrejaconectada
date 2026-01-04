@@ -97,7 +97,10 @@ export default function DetalhesMembro() {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-slate-900">Detalhes do Membro</h1>
           </div>
-          <Button onClick={() => navigate(createPageUrl('Membros'))} className="bg-gradient-to-r from-blue-500 to-purple-600">
+          <Button
+            onClick={() => navigate(`${createPageUrl('Membros')}?action=editar&id=${membro.id}`)}
+            className="bg-gradient-to-r from-blue-500 to-purple-600"
+          >
             <Edit className="w-4 h-4 mr-2" />
             Editar
           </Button>
