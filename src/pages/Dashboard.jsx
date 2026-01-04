@@ -73,6 +73,12 @@ export default function Dashboard() {
     ? membros
     : membros.filter((m) => m.congregacao_id === user?.congregacao_id);
 
+  const filteredDepartamentos = isAdmin
+    ? departamentos
+    : departamentos.filter(
+        (d) => !d.congregacao_id || d.congregacao_id === user?.congregacao_id
+      );
+
   const membrosAtivos = filteredMembros.filter((m) => m.ativo);
   const membrosPorTipo = {
     membro: filteredMembros.filter((m) => m.tipo === 'membro').length,
@@ -125,7 +131,7 @@ export default function Dashboard() {
       : []),
     {
       title: 'Departamentos',
-      value: departamentos.filter((d) => d.ativo).length,
+      value: filteredDepartamentos.filter((d) => d.ativo).length,
       icon: GitBranch,
       color: 'from-green-500 to-green-600',
       trend: 'Ativos',
