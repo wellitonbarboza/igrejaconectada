@@ -50,6 +50,7 @@ export default function Membros() {
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [statusFiltro, setStatusFiltro] = useState('todos');
   const [congregacaoFiltro, setCongregacaoFiltro] = useState('todas');
+  const [ordenacaoFiltro, setOrdenacaoFiltro] = useState('az');
   const [showModal, setShowModal] = useState(false);
   const [membroSelecionado, setMembroSelecionado] = useState(null);
   const editHandledRef = useRef(false);
@@ -113,6 +114,13 @@ export default function Membros() {
       matchesCongregacao &&
       matchesUserCongregacao
     );
+  });
+
+  const sortedMembros = [...filteredMembros].sort((a, b) => {
+    const nomeA = a.nome_completo || '';
+    const nomeB = b.nome_completo || '';
+    const direction = ordenacaoFiltro === 'az' ? 1 : -1;
+    return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' }) * direction;
   });
 
   const handleEdit = (membro) => {
@@ -191,7 +199,9 @@ export default function Membros() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div
+              className={`grid grid-cols-1 gap-4 ${isAdmin ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
+            >
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
@@ -224,6 +234,16 @@ export default function Membros() {
                   <SelectItem value="ativo">Ativo</SelectItem>
                   <SelectItem value="inativo">Inativo</SelectItem>
                   <SelectItem value="transferido">Transferido</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={ordenacaoFiltro} onValueChange={setOrdenacaoFiltro}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Ordenação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="az">Nome A-Z</SelectItem>
+                  <SelectItem value="za">Nome Z-A</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -275,7 +295,7 @@ export default function Membros() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredMembros.map((membro) => (
+                    sortedMembros.map((membro) => (
                       <TableRow
                         key={membro.id}
                         className="hover:bg-slate-50 cursor-pointer"
