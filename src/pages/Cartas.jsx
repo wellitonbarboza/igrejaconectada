@@ -205,7 +205,7 @@ export default function Cartas() {
     };
 
     return (
-      <div className="bg-white p-8 max-w-4xl mx-auto shadow-2xl print:shadow-none" style={{ minHeight: '297mm' }}>
+      <div className="bg-white p-6 md:p-8 max-w-4xl mx-auto shadow-2xl print:shadow-none print:p-4 print:max-w-none print:h-[265mm] print:overflow-hidden">
         <div className="text-center mb-8 pb-5 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
@@ -227,8 +227,8 @@ export default function Cartas() {
           </div>
         </div>
 
-        <div className="flex flex-col" style={{ minHeight: '215mm' }}>
-          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-7 leading-7' : 'space-y-6 leading-8'}`}>
+        <div className="flex flex-col h-full">
+          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-6.5' : 'space-y-4 leading-7'}`}>
             <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide">{tipoCartaTitulo[tipoCarta]}</h2>
 
             {modoFormularioImpresso ? (
@@ -271,8 +271,8 @@ export default function Cartas() {
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-12 space-y-8">
-            <div className="grid grid-cols-2 gap-10 text-center">
+          <div className="mt-auto pt-8 space-y-5">
+            <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
                 <p className="font-semibold text-slate-900">{config.pastor_presidente || 'Pastor Presidente'}</p>
@@ -285,7 +285,7 @@ export default function Cartas() {
             </div>
 
             <div className="text-center">
-              <p className="text-xl font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
+              <p className="text-lg font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
               <p className="text-xs text-slate-500 mt-1">I Samuel 7:12b.</p>
             </div>
           </div>
@@ -297,18 +297,39 @@ export default function Cartas() {
   return (
     <div className="p-4 md:p-8 min-h-screen">
       <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 6mm;
+        }
+
         @media print {
+          html, body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
           body * {
             visibility: hidden;
           }
+
           .print-area, .print-area * {
             visibility: visible;
           }
+
           .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
+            position: fixed;
+            inset: 0;
             width: 100%;
+            height: 100%;
+            margin: 0 !important;
+            padding: 0 !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
         }
       `}</style>
