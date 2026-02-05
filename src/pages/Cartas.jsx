@@ -31,6 +31,7 @@ export default function Cartas() {
   const [estadoDestino, setEstadoDestino] = useState('');
   const [funcaoMinisterial, setFuncaoMinisterial] = useState('');
   const [historicoEditando, setHistoricoEditando] = useState(null);
+  const [modoFormularioImpresso, setModoFormularioImpresso] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const cartaRef = useRef(null);
 
@@ -205,13 +206,13 @@ export default function Cartas() {
 
     return (
       <div className="bg-white p-8 max-w-4xl mx-auto shadow-2xl print:shadow-none" style={{ minHeight: '297mm' }}>
-        <div className="text-center mb-12 pb-6 border-b-2 border-blue-600">
+        <div className="text-center mb-8 pb-5 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
             alt="Logo"
-            className="h-24 mx-auto mb-4"
+            className="h-20 mx-auto mb-3"
           />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">{config.nome_igreja}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">{config.nome_igreja}</h1>
           <div className="text-sm text-slate-600 space-y-1">
             {config.endereco_completo && <p>{config.endereco_completo}</p>}
             {(config.cidade || config.estado) && (
@@ -223,40 +224,69 @@ export default function Cartas() {
             )}
             {config.telefone && <p>Tel: {config.telefone}</p>}
             {config.email && <p>Email: {config.email}</p>}
-            {config.cnpj && <p>CNPJ: {config.cnpj}</p>}
           </div>
         </div>
 
-        <div className="space-y-5 text-justify">
-          <h2 className="text-xl font-bold text-center text-slate-900 mb-2">{tipoCartaTitulo[tipoCarta]}</h2>
+        <div className="flex flex-col" style={{ minHeight: '215mm' }}>
+          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-7 leading-7' : 'space-y-6 leading-8'}`}>
+            <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide">{tipoCartaTitulo[tipoCarta]}</h2>
 
-          <div className="space-y-4 text-slate-800 leading-relaxed">
-            <p>
-              Apresentamos à Igreja Evangélica Assembleia de Deus em{' '}
-              <strong>{cidadeDestino || '______________________________'}</strong>
-              {', '}
-              <strong>{estadoDestino || '__'}</strong>, o(a) irmão(ã): <strong>{nomeCompleto}</strong>, que congrega em Santa Tereza do Oeste - PR.
-            </p>
-            <p>
-              O(A) irmão(ã) serve ao Senhor como:{' '}
-              <strong>{funcaoMinisterial || '________________________________________________'}</strong>.
-            </p>
-            <p>Portanto, pedimos que o(a) recebais no Senhor como usam fazer os santos.</p>
+            {modoFormularioImpresso ? (
+              <>
+                <div>
+                  <p>Apresentamos à Igreja Evangélica Assembleia de Deus em</p>
+                  <p className="border-b border-slate-400 mt-2 pb-1">{cidadeDestino || ''} {cidadeDestino && ','} {estadoDestino || ''}</p>
+                </div>
+                <div>
+                  <p>o(a) irmão(ã):</p>
+                  <p className="border-b border-slate-400 mt-2 pb-1">{nomeCompleto}</p>
+                  <p className="mt-3">que congrega em Santa Tereza do Oeste - PR.</p>
+                </div>
+                <div>
+                  <p>O(A) irmão(ã) serve ao Senhor como:</p>
+                  <p className="border-b border-slate-400 mt-2 pb-1">{funcaoMinisterial || ''}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-justify">
+                  Apresentamos à Igreja Evangélica Assembleia de Deus em <strong>{cidadeDestino || '______________________________'}</strong>,{' '}
+                  <strong>{estadoDestino || '__'}</strong>.
+                </p>
+                <p className="text-justify">
+                  o(a) irmão(ã): <strong>{nomeCompleto}</strong>, que congrega em Santa Tereza do Oeste - PR.
+                </p>
+                <p className="text-justify">
+                  O(A) irmão(ã) serve ao Senhor como: <strong>{funcaoMinisterial || '________________________________________'}</strong>.
+                </p>
+              </>
+            )}
+
+            <p className="text-justify">Portanto, pedimos que o(a) recebais no Senhor como usam fazer os santos.</p>
+
             <p>
               Santa Tereza do Oeste/PR, <strong>{dataAtual}</strong>.
             </p>
+
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-12 pt-4 grid grid-cols-2 gap-8 text-center">
-            <div>
-              <div className="border-t-2 border-slate-400 w-64 mx-auto mb-2"></div>
-              <p className="font-bold text-slate-900">{config.pastor_presidente || 'Pastor Presidente'}</p>
-              <p className="text-slate-600">Pastor Presidente</p>
+          <div className="mt-auto pt-12 space-y-8">
+            <div className="grid grid-cols-2 gap-10 text-center">
+              <div>
+                <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
+                <p className="font-semibold text-slate-900">{config.pastor_presidente || 'Pastor Presidente'}</p>
+                <p className="text-sm text-slate-600">Pastor Presidente</p>
+              </div>
+              <div>
+                <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
+                <p className="font-semibold text-slate-900">Secretário</p>
+              </div>
             </div>
-            <div>
-              <div className="border-t-2 border-slate-400 w-64 mx-auto mb-2"></div>
-              <p className="font-bold text-slate-900">Secretário</p>
+
+            <div className="text-center">
+              <p className="text-xl font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
+              <p className="text-xs text-slate-500 mt-1">I Samuel 7:12b.</p>
             </div>
           </div>
         </div>
@@ -322,6 +352,22 @@ export default function Cartas() {
                       <SelectItem value="transferencia">Carta de Transferência</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-start gap-3 p-4 rounded-lg border bg-slate-50">
+                  <Checkbox
+                    id="modo_formulario"
+                    checked={modoFormularioImpresso}
+                    onCheckedChange={(checked) => setModoFormularioImpresso(Boolean(checked))}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="modo_formulario" className="cursor-pointer font-semibold text-slate-800">
+                      Modo formulário impresso (versão secretaria)
+                    </Label>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Ativa linhas-guia e espaçamento do modelo físico para facilitar conferência e impressão manual.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
