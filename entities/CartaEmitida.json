@@ -1,0 +1,64 @@
+{
+  "name": "CartaEmitida",
+  "type": "object",
+  "properties": {
+    "tipo_carta": {
+      "type": "string",
+      "enum": ["recomendacao", "mudanca", "transferencia"],
+      "description": "Tipo da carta emitida"
+    },
+    "membro_id": {
+      "type": "string",
+      "description": "ID do membro relacionado à carta"
+    },
+    "membro_nome": {
+      "type": "string",
+      "description": "Nome do membro no momento da emissão"
+    },
+    "incluir_familia": {
+      "type": "boolean",
+      "description": "Define se a carta foi emitida com o sufixo e Família"
+    },
+    "cidade_destino": {
+      "type": "string",
+      "description": "Cidade de destino da carta"
+    },
+    "estado_destino": {
+      "type": "string",
+      "description": "UF de destino da carta"
+    },
+    "funcao_ministerial": {
+      "type": "string",
+      "description": "Função ministerial informada no corpo da carta"
+    },
+    "congregacao_id": {
+      "type": "string",
+      "description": "ID da congregação vinculada ao membro"
+    },
+    "congregacao_nome": {
+      "type": "string",
+      "description": "Nome da congregação vinculada ao membro"
+    },
+    "emitida_em": {
+      "type": "string",
+      "description": "Data e hora ISO da emissão"
+    },
+    "emitido_por": {
+      "type": "string",
+      "description": "Nome do usuário responsável pela emissão"
+    },
+    "arquivo_bucket": {
+      "type": "string",
+      "description": "Bucket de armazenamento do arquivo"
+    },
+    "arquivo_path": {
+      "type": "string",
+      "description": "Caminho do arquivo salvo no storage"
+    },
+    "arquivo_url": {
+      "type": "string",
+      "description": "URL pública do arquivo salvo"
+    }
+  },
+  "required": ["tipo_carta", "membro_nome", "emitida_em"]
+}
