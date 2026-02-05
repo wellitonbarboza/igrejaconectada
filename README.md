@@ -63,6 +63,12 @@ VITE_SUPABASE_STORAGE_BUCKET=documentos
 3. Em **Storage**, confirme que existe um bucket público com o mesmo nome definido na variável `VITE_SUPABASE_STORAGE_BUCKET` (por padrão, `documentos`).
 4. Para administrar usuários pela aplicação, utilize perfis com `role = 'admin'`. O primeiro usuário pode ser promovido diretamente no painel SQL atualizando a coluna `role` da tabela `profiles`.
 
+5. A funcionalidade de histórico de cartas depende das migrations:
+   - `supabase/migrations/20250615103000_create_cartas_emitidas.sql`
+   - `supabase/migrations/20250615113000_add_emitido_por_cartas_emitidas.sql`
+   - Se você usa Supabase CLI: `supabase db push`
+   - Se aplica manualmente: execute esses arquivos no SQL Editor antes de usar a tela de Cartas.
+
 > Observação: a exclusão de usuários na tela administrativa remove apenas o registro em `profiles`. Remoções definitivas do usuário (auth.users) devem ser feitas pelo painel do Supabase utilizando uma `service_role` key.
 
 ## Licença

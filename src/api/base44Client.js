@@ -228,6 +228,7 @@ export const base44 = {
     Departamento: createEntityClient('departamentos'),
     Config: createEntityClient('configs'),
     Perfil: createEntityClient('profiles'),
+    CartaEmitida: createEntityClient('cartas_emitidas'),
   },
   integrations: {
     Core: {
