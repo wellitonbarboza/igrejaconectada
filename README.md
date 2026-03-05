@@ -79,6 +79,7 @@ VITE_SUPABASE_STORAGE_BUCKET=documentos
 - Para suportar classificação operacional de usuários, aplique também `supabase/migrations/20260605103000_add_cargo_to_profiles.sql` e utilize o campo `cargo` no cadastro de usuários.
 - Em cenários de conflito `409` no cadastro de usuários, o fluxo administrativo agora trata e-mail duplicado como atualização do registro existente, reduzindo falhas operacionais de cadastro.
 - Para criação de novos usuários (auth + profile) via painel administrativo, defina `VITE_SUPABASE_SERVICE_ROLE_KEY`; sem ela, o app não consegue criar registros em `auth.users`.
+- Em cenários de conflito `409` no cadastro de usuários, o fluxo administrativo agora trata e-mail duplicado como atualização do registro existente, reduzindo falhas operacionais de cadastro.
 
 ## Upload de fotos de membros
 
