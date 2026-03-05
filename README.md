@@ -77,7 +77,10 @@ VITE_SUPABASE_STORAGE_BUCKET=documentos
 - Para reforçar segurança no backend, aplique a migration `supabase/migrations/20260605100000_restore_rls_roles.sql` para restaurar RLS e limitar mutações sensíveis ao perfil `admin` (sem depender da coluna `congregacao_id` em `profiles`).
 - Recomenda-se manter uma matriz de acesso por funcionalidade (ex.: membros, congregações, configurações) e revisar semestralmente.
 - Para suportar classificação operacional de usuários, aplique também `supabase/migrations/20260605103000_add_cargo_to_profiles.sql` e utilize o campo `cargo` no cadastro de usuários.
+<<<<<<< codex/review-code-for-access-levels-and-photo-upload-nky1hm
 - Em cenários de conflito `409` no cadastro de usuários, o fluxo administrativo agora trata e-mail duplicado como atualização do registro existente, reduzindo falhas operacionais de cadastro.
+=======
+>>>>>>> main
 
 ## Upload de fotos de membros
 
