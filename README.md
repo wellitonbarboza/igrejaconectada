@@ -71,6 +71,25 @@ VITE_SUPABASE_STORAGE_BUCKET=documentos
 
 > Observação: a exclusão de usuários na tela administrativa remove apenas o registro em `profiles`. Remoções definitivas do usuário (auth.users) devem ser feitas pelo painel do Supabase utilizando uma `service_role` key.
 
+## Governança de acesso (Admin x Usuário)
+
+- O frontend agora aplica permissões por página em `src/utils/accessControl.js`.
+- Para reforçar segurança no backend, aplique a migration `supabase/migrations/20260605100000_restore_rls_roles.sql` para restaurar RLS e limitar mutações sensíveis ao perfil `admin`.
+- Recomenda-se manter uma matriz de acesso por funcionalidade (ex.: membros, congregações, configurações) e revisar semestralmente.
+
+## Upload de fotos de membros
+
+- O fluxo de cadastro foi ajustado para:
+  1. validar arquivo (`JPG/PNG/WEBP`, até `5MB`),
+  2. criar o membro,
+  3. enviar a foto com caminho definitivo baseado no `id` real do membro,
+  4. atualizar o registro com `foto_url`, `foto_path` e `foto_bucket`.
+- Essa sequência evita inconsistência de caminho e melhora rastreabilidade dos arquivos.
+- Como boa prática operacional, recomenda-se:
+  - padronizar resolução (ex.: 512x512 já aplicada no editor),
+  - monitorar falhas de upload (logs),
+  - e criar rotina de limpeza para fotos órfãs no bucket.
+
 ## Licença
 
 Distribuído para fins educacionais/demonstrativos.

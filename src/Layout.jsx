@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { describeRole, hasPageAccess } from '@/utils/accessControl';
 import { useAuth } from '@/context/AuthContext.jsx';
 import {
   LayoutDashboard,
@@ -33,62 +34,61 @@ export default function Layout({ children }) {
   const location = useLocation();
   const { user } = useAuth();
 
-  const isAdmin = user?.role === 'admin';
-
   const navigationItems = [
     {
       title: 'Dashboard',
       url: createPageUrl('Dashboard'),
       icon: LayoutDashboard,
+      page: 'Dashboard',
     },
     {
       title: 'Membros',
       url: createPageUrl('Membros'),
       icon: Users,
+      page: 'Membros',
     },
     {
       title: 'Departamentos',
       url: createPageUrl('Departamentos'),
       icon: GitBranch,
+      page: 'Departamentos',
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Congregações',
-            url: createPageUrl('Congregacoes'),
-            icon: Building2,
-          },
-          {
-            title: 'Usuários',
-            url: createPageUrl('Usuarios'),
-            icon: Users,
-          },
-        ]
-      : []),
+    {
+      title: 'Congregações',
+      url: createPageUrl('Congregacoes'),
+      icon: Building2,
+      page: 'Congregacoes',
+    },
+    {
+      title: 'Usuários',
+      url: createPageUrl('Usuarios'),
+      icon: Users,
+      page: 'Usuarios',
+    },
     {
       title: 'Relatórios',
       url: createPageUrl('Relatorios'),
       icon: FileText,
+      page: 'Relatorios',
     },
     {
       title: 'Cartas',
       url: createPageUrl('Cartas'),
       icon: Mail,
+      page: 'Cartas',
     },
     {
       title: 'Cartões',
       url: createPageUrl('Cartoes'),
       icon: CreditCard,
+      page: 'Cartoes',
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Configurações',
-            url: createPageUrl('Configuracoes'),
-            icon: Settings,
-          },
-        ]
-      : []),
+    {
+      title: 'Configurações',
+      url: createPageUrl('Configuracoes'),
+      icon: Settings,
+      page: 'Configuracoes',
+    },
   ];
 
   return (
@@ -121,7 +121,7 @@ export default function Layout({ children }) {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {navigationItems.map((item) => (
+                  {navigationItems.filter((item) => hasPageAccess(user, item.page)).map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
@@ -172,12 +172,12 @@ export default function Layout({ children }) {
                   {user?.full_name || 'Usuário'}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
-                  {user?.role === 'admin' ? 'Administrador' : 'Líder'}
+                  {describeRole(user?.role)}
                 </p>
               </div>
             </div>
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                Sessão administrativa fixa.
+                Permissões aplicadas conforme nível de acesso.
               </div>
             </div>
           </SidebarFooter>

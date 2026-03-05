@@ -33,6 +33,7 @@ export default function ModalMembro({
   const DRAFT_KEY = 'draft_membro';
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [pendingFotoFile, setPendingFotoFile] = useState(null);
   const [pendingFotoPreview, setPendingFotoPreview] = useState('');
   const [rawFotoFile, setRawFotoFile] = useState(null);
@@ -228,22 +229,15 @@ export default function ModalMembro({
       }
       return base44.entities.Membro.create(dataToSave);
     },
-    onSuccess: () => {
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(DRAFT_KEY);
-      }
-      queryClient.invalidateQueries({ queryKey: ['membros'] });
-      onClose();
-    },
   });
 
-  const uploadFotoFile = async (file) => {
+  const uploadFotoFile = async (file, membroId = null) => {
     if (!file) return;
 
     const fileToUpload = await compressImage(file, { maxSize: 800, quality: 0.8 });
     const extension = fileToUpload.name?.split('.').pop() || 'jpg';
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-    const baseId = membro?.id || uploadSessionIdRef.current;
+    const baseId = membroId || membro?.id || uploadSessionIdRef.current;
     const filePath = `membros/${baseId}/fotos/${fileName}`;
     const { file_url, path } = await base44.integrations.Core.UploadFile({
       file: fileToUpload,
@@ -253,10 +247,32 @@ export default function ModalMembro({
     return { file_url, filePath: path || filePath };
   };
 
+  const validateFotoFile = (file) => {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSizeInBytes = 5 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) {
+      return 'Formato inválido. Envie JPG, PNG ou WEBP.';
+    }
+
+    if (file.size > maxSizeInBytes) {
+      return 'A foto deve ter no máximo 5MB.';
+    }
+
+    return '';
+  };
+
   const handleFotoFileChange = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    const validationError = validateFotoFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+
+    setUploadError('');
     if (rawFotoPreview) {
       URL.revokeObjectURL(rawFotoPreview);
     }
@@ -269,35 +285,58 @@ export default function ModalMembro({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    let dataToSave = formData;
+    setUploadError('');
 
-    if (pendingFotoFile) {
-      setUploading(true);
-      try {
-        const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
-        dataToSave = {
+    const dataToSave = { ...formData };
+    setUploading(true);
+
+    try {
+      if (!membro) {
+        const createdMembro = await saveMutation.mutateAsync({
           ...dataToSave,
-          foto_url: file_url,
-          foto_path: filePath,
+          foto_url: '',
+          foto_path: '',
           foto_bucket: STORAGE_BUCKETS.fotosMembros,
-        };
-        updateFormData((prev) => ({
-          ...prev,
-          foto_url: file_url,
-          foto_path: filePath,
-          foto_bucket: STORAGE_BUCKETS.fotosMembros,
-        }));
-        setPendingFotoFile(null);
-        setPendingFotoPreview('');
-      } catch (error) {
-        console.error('Erro ao fazer upload da foto:', error);
-        setUploading(false);
-        return;
+        });
+
+        const createdRecord = Array.isArray(createdMembro) ? createdMembro[0] : createdMembro;
+        if (pendingFotoFile && createdRecord?.id) {
+          const { file_url, filePath } = await uploadFotoFile(pendingFotoFile, createdRecord.id);
+          await base44.entities.Membro.update(createdRecord.id, {
+            foto_url: file_url,
+            foto_path: filePath,
+            foto_bucket: STORAGE_BUCKETS.fotosMembros,
+          });
+        }
+
+      } else {
+        let payload = dataToSave;
+        if (pendingFotoFile) {
+          const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
+          payload = {
+            ...payload,
+            foto_url: file_url,
+            foto_path: filePath,
+            foto_bucket: STORAGE_BUCKETS.fotosMembros,
+          };
+        }
+
+        await saveMutation.mutateAsync(payload);
       }
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(DRAFT_KEY);
+      }
+      queryClient.invalidateQueries({ queryKey: ['membros'] });
+      onClose();
+      setPendingFotoFile(null);
+      setPendingFotoPreview('');
+    } catch (error) {
+      console.error('Erro ao salvar membro com foto:', error);
+      setUploadError('Não foi possível salvar a foto. Tente novamente.');
+    } finally {
       setUploading(false);
     }
-
-    saveMutation.mutate(dataToSave);
   };
 
   const handleChange = (field, value) => {
@@ -648,7 +687,8 @@ export default function ModalMembro({
                       {uploading ? 'Enviando...' : 'Usar Câmera'}
                     </Button>
                   </div>
-                  <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG. Tamanho máximo: 5MB</p>
+                  <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG ou WEBP. Tamanho máximo: 5MB</p>
+                  {uploadError && <p className="text-sm text-red-600 mt-1">{uploadError}</p>}
                 </div>
               </div>
             </div>
