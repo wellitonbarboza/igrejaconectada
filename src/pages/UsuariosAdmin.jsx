@@ -35,11 +35,48 @@ export default function UsuariosAdmin() {
   });
 
   const createUserMutation = useMutation({
-    mutationFn: (payload) => base44.entities.Perfil.create(payload),
+    mutationFn: async (payload) => {
+      const normalizedEmail = payload.email?.trim().toLowerCase();
+      const existingUser = usuarios.find(
+        (item) => item.email?.trim().toLowerCase() === normalizedEmail
+      );
+
+      if (existingUser?.id) {
+        return base44.entities.Perfil.update(existingUser.id, {
+          full_name: payload.full_name,
+          role: payload.role,
+          cargo: payload.cargo,
+        });
+      }
+
+      try {
+        return await base44.entities.Perfil.create(payload);
+      } catch (error) {
+        if (String(error?.message || '').includes('409')) {
+          const refreshedUsers = await base44.entities.Perfil.list('full_name');
+          const conflicted = refreshedUsers.find(
+            (item) => item.email?.trim().toLowerCase() === normalizedEmail
+          );
+          if (conflicted?.id) {
+            return base44.entities.Perfil.update(conflicted.id, {
+              full_name: payload.full_name,
+              role: payload.role,
+              cargo: payload.cargo,
+            });
+          }
+        }
+        throw error;
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
       setShowModal(false);
       setNovoUsuario(defaultNovoUsuario);
+      alert('Usuário salvo com sucesso.');
+    },
+    onError: (error) => {
+      console.error('Erro ao salvar usuário:', error);
+      alert('Não foi possível salvar o usuário. Verifique duplicidade de e-mail e tente novamente.');
     },
   });
 
