@@ -16,6 +16,7 @@ import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
 import Download from '@/pages/Download.jsx';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/context/AuthContext.jsx';
+import { hasPageAccess } from '@/utils/accessControl';
 
 function ProtectedShell() {
   const { user, loading } = useAuth();
@@ -32,7 +33,7 @@ function ProtectedShell() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="text-center space-y-2">
-          <p className="text-slate-600">Carregando acesso administrativo...</p>
+          <p className="text-slate-600">Carregando acesso...</p>
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       </div>
@@ -46,6 +47,16 @@ function ProtectedShell() {
   );
 }
 
+function ProtectedRoute({ page, children }) {
+  const { user } = useAuth();
+
+  if (!hasPageAccess(user, page)) {
+    return <Navigate to={createPageUrl('Dashboard')} replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -54,15 +65,15 @@ export default function App() {
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
         <Route path={createPageUrl('Membros')} element={<Membros />} />
         <Route path={createPageUrl('DetalhesMembro')} element={<DetalhesMembro />} />
-        <Route path={createPageUrl('DetalhesCongregacao')} element={<DetalhesCongregacao />} />
+        <Route path={createPageUrl('DetalhesCongregacao')} element={<ProtectedRoute page="Congregacoes"><DetalhesCongregacao /></ProtectedRoute>} />
         <Route path={createPageUrl('DetalhesDepartamento')} element={<DetalhesDepartamento />} />
         <Route path={createPageUrl('Departamentos')} element={<Departamentos />} />
-        <Route path={createPageUrl('Congregacoes')} element={<Congregacoes />} />
+        <Route path={createPageUrl('Congregacoes')} element={<ProtectedRoute page="Congregacoes"><Congregacoes /></ProtectedRoute>} />
         <Route path={createPageUrl('Relatorios')} element={<Relatorios />} />
         <Route path={createPageUrl('Cartoes')} element={<Cartoes />} />
-        <Route path={createPageUrl('Configuracoes')} element={<Configuracoes />} />
+        <Route path={createPageUrl('Configuracoes')} element={<ProtectedRoute page="Configuracoes"><Configuracoes /></ProtectedRoute>} />
         <Route path={createPageUrl('Cartas')} element={<Cartas />} />
-        <Route path={createPageUrl('Usuarios')} element={<UsuariosAdmin />} />
+        <Route path={createPageUrl('Usuarios')} element={<ProtectedRoute page="Usuarios"><UsuariosAdmin /></ProtectedRoute>} />
         <Route path={createPageUrl('Download')} element={<Navigate to={`${createPageUrl('Download')}/mobile`} replace />} />
         <Route path={`${createPageUrl('Download')}/:platform`} element={<Download />} />
         <Route path="*" element={<Navigate to={createPageUrl('Dashboard')} replace />} />

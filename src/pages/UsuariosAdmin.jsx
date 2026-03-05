@@ -1,19 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, UserPlus, Shield, Mail, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Navigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
+const defaultNovoUsuario = {
+  full_name: '',
+  email: '',
+  role: 'usuario',
+  cargo: '',
+};
+
 export default function UsuariosAdmin() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [showModal, setShowModal] = useState(false);
+  const [novoUsuario, setNovoUsuario] = useState(defaultNovoUsuario);
+
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ['usuarios'],
     queryFn: () => base44.entities.Perfil.list('full_name'),
@@ -21,8 +34,31 @@ export default function UsuariosAdmin() {
     enabled: user?.role === 'admin',
   });
 
+  const createUserMutation = useMutation({
+    mutationFn: async (payload) => {
+      return base44.auth.createUserWithProfile(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      setShowModal(false);
+      setNovoUsuario(defaultNovoUsuario);
+      alert('Usuário salvo com sucesso.');
+    },
+    onError: (error) => {
+      console.error('Erro ao salvar usuário:', error);
+      alert('Não foi possível salvar o usuário. Verifique se a service role está configurada e se o e-mail já não está em uso.');
+    },
+  });
+
   const updateRoleMutation = useMutation({
     mutationFn: ({ id, role }) => base44.entities.Perfil.update(id, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+    },
+  });
+
+  const updateCargoMutation = useMutation({
+    mutationFn: ({ id, cargo }) => base44.entities.Perfil.update(id, { cargo }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
     },
@@ -39,6 +75,10 @@ export default function UsuariosAdmin() {
     updateRoleMutation.mutate({ id: usuario.id, role });
   };
 
+  const handleChangeCargo = (usuario, cargo) => {
+    updateCargoMutation.mutate({ id: usuario.id, cargo });
+  };
+
   const handleDelete = (usuario) => {
     if (usuario.id === user?.id) {
       alert('Você não pode remover o próprio usuário enquanto estiver conectado.');
@@ -47,6 +87,22 @@ export default function UsuariosAdmin() {
     if (window.confirm('Deseja realmente remover este usuário?')) {
       deleteMutation.mutate(usuario.id);
     }
+  };
+
+  const handleCreateUser = (event) => {
+    event.preventDefault();
+
+    if (!novoUsuario.full_name.trim() || !novoUsuario.email.trim()) {
+      alert('Preencha nome e e-mail para continuar.');
+      return;
+    }
+
+    createUserMutation.mutate({
+      ...novoUsuario,
+      full_name: novoUsuario.full_name.trim(),
+      email: novoUsuario.email.trim().toLowerCase(),
+      cargo: novoUsuario.cargo.trim(),
+    });
   };
 
   if (user?.role !== 'admin') {
@@ -84,12 +140,12 @@ export default function UsuariosAdmin() {
               Administração de Usuários
             </h1>
             <p className="text-slate-500 mt-2">
-              Gerencie quem pode acessar o painel e defina os níveis de permissão da sua equipe.
+              Cadastre usuários, defina nível de acesso e cargo operacional de cada pessoa.
             </p>
           </div>
-          <Button disabled className="bg-gradient-to-r from-blue-500 to-purple-600">
+          <Button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-500 to-purple-600">
             <UserPlus className="w-4 h-4 mr-2" />
-            Cadastro desativado
+            Novo usuário
           </Button>
         </div>
 
@@ -124,6 +180,7 @@ export default function UsuariosAdmin() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Cargo</TableHead>
                     <TableHead>Nível</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -140,6 +197,13 @@ export default function UsuariosAdmin() {
                           <Mail className="w-4 h-4" />
                           {usuario.email || '—'}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          defaultValue={usuario.cargo || ''}
+                          placeholder="Ex.: Pastor, Secretária"
+                          onBlur={(event) => handleChangeCargo(usuario, event.target.value)}
+                        />
                       </TableCell>
                       <TableCell>
                         <Select value={usuario.role || 'usuario'} onValueChange={(value) => handleChangeRole(usuario, value)}>
@@ -170,6 +234,67 @@ export default function UsuariosAdmin() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo usuário</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            <div>
+              <Label htmlFor="full_name">Nome completo</Label>
+              <Input
+                id="full_name"
+                value={novoUsuario.full_name}
+                onChange={(event) => setNovoUsuario((prev) => ({ ...prev, full_name: event.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                value={novoUsuario.email}
+                onChange={(event) => setNovoUsuario((prev) => ({ ...prev, email: event.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="cargo">Cargo</Label>
+              <Input
+                id="cargo"
+                placeholder="Ex.: Pastor, Tesoureiro, Secretária"
+                value={novoUsuario.cargo}
+                onChange={(event) => setNovoUsuario((prev) => ({ ...prev, cargo: event.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="role">Nível de acesso</Label>
+              <Select
+                value={novoUsuario.role}
+                onValueChange={(value) => setNovoUsuario((prev) => ({ ...prev, role: value }))}
+              >
+                <SelectTrigger id="role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="usuario">Usuário</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="pt-2 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createUserMutation.isPending}>
+                {createUserMutation.isPending ? 'Salvando...' : 'Salvar usuário'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

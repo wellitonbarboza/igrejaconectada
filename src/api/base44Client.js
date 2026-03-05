@@ -123,6 +123,60 @@ async function authenticatedRequest(path, { method = 'GET', body, headers = {}, 
   return response.text();
 }
 
+
+async function createAuthAdminUser({ email, password, full_name }) {
+  assertSupabaseEnv();
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Para criar usuários no painel, configure VITE_SUPABASE_SERVICE_ROLE_KEY.');
+  }
+
+  const authToken = getAdminAuthToken();
+  const apiKey = getAdminApiKey();
+  const fallbackPassword =
+    password || `${Math.random().toString(36).slice(2)}A!${Date.now().toString(36)}`;
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password: fallbackPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: full_name || '',
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    if (response.status === 401) {
+      throw new Error(buildUnauthorizedMessage(text));
+    }
+    throw new Error(text || 'Erro ao criar usuário no auth.users');
+  }
+
+  return response.json();
+}
+
+async function upsertProfileById(profilePayload) {
+  const data = await authenticatedRequest(`/rest/v1/profiles`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=representation',
+    },
+    body: profilePayload,
+    query: '?on_conflict=id&select=*',
+  });
+
+  return Array.isArray(data) ? data[0] : data;
+}
+
 function buildOrderQuery(ordering) {
   if (!ordering) return '';
   const ascending = !ordering.startsWith('-');
@@ -217,6 +271,45 @@ export const base44 = {
     },
     async register() {
       throw new Error('Cadastro de usuários desativado.');
+    },
+    async createUserWithProfile({ full_name, email, role = 'usuario', cargo = '' }) {
+      const normalizedEmail = email?.trim().toLowerCase();
+      if (!normalizedEmail) {
+        throw new Error('E-mail é obrigatório para cadastrar usuário.');
+      }
+
+      const profiles = await authenticatedRequest('/rest/v1/profiles', {
+        query: `?select=*&email=eq.${encodeURIComponent(normalizedEmail)}`,
+      });
+      const existingProfile = Array.isArray(profiles) ? profiles[0] : null;
+
+      if (existingProfile?.id) {
+        return upsertProfileById({
+          id: existingProfile.id,
+          full_name: full_name || existingProfile.full_name || '',
+          email: normalizedEmail,
+          role,
+          cargo,
+        });
+      }
+
+      const createdAuthUser = await createAuthAdminUser({
+        email: normalizedEmail,
+        full_name,
+      });
+
+      const userId = createdAuthUser?.user?.id;
+      if (!userId) {
+        throw new Error('Não foi possível obter o id do usuário criado no auth.users.');
+      }
+
+      return upsertProfileById({
+        id: userId,
+        full_name: full_name || '',
+        email: normalizedEmail,
+        role,
+        cargo,
+      });
     },
     async logout() {
       return null;
