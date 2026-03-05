@@ -1,5 +1,5 @@
 -- Restaura uma base mínima de segurança para níveis de acesso (admin e usuario)
--- e permite que o frontend evolua para RBAC por página com segurança no banco.
+-- sem depender de colunas opcionais no perfil (ex.: congregacao_id).
 
 alter table public.profiles enable row level security;
 alter table public.membros enable row level security;
@@ -10,9 +10,11 @@ alter table public.configs enable row level security;
 -- Limpa políticas antigas para evitar conflito.
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 drop policy if exists "profiles_update_admin_or_self" on public.profiles;
+drop policy if exists "profiles_insert_admin" on public.profiles;
+drop policy if exists "profiles_delete_admin" on public.profiles;
 drop policy if exists "membros_select_authenticated" on public.membros;
 drop policy if exists "membros_insert_authenticated" on public.membros;
-drop policy if exists "membros_update_admin_or_mesma_congregacao" on public.membros;
+drop policy if exists "membros_update_authenticated" on public.membros;
 drop policy if exists "membros_delete_admin" on public.membros;
 drop policy if exists "departamentos_select_authenticated" on public.departamentos;
 drop policy if exists "departamentos_mutation_admin" on public.departamentos;
@@ -44,6 +46,26 @@ create policy "profiles_update_admin_or_self"
     )
   );
 
+create policy "profiles_insert_admin"
+  on public.profiles for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'admin'
+    )
+  );
+
+create policy "profiles_delete_admin"
+  on public.profiles for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'admin'
+    )
+  );
+
 create policy "membros_select_authenticated"
   on public.membros for select
   to authenticated
@@ -54,31 +76,11 @@ create policy "membros_insert_authenticated"
   to authenticated
   with check (true);
 
-create policy "membros_update_admin_or_mesma_congregacao"
+create policy "membros_update_authenticated"
   on public.membros for update
   to authenticated
-  using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid()
-        and (
-          p.role = 'admin'
-          or p.congregacao_id is null
-          or p.congregacao_id = membros.congregacao_id
-        )
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid()
-        and (
-          p.role = 'admin'
-          or p.congregacao_id is null
-          or p.congregacao_id = membros.congregacao_id
-        )
-    )
-  );
+  using (true)
+  with check (true);
 
 create policy "membros_delete_admin"
   on public.membros for delete
