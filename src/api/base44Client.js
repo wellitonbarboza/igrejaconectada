@@ -73,6 +73,24 @@ function buildUnauthorizedMessage(details) {
   );
 }
 
+function parseSupabaseErrorResponse(rawText) {
+  if (!rawText) return { details: '', code: '' };
+
+  try {
+    const parsed = JSON.parse(rawText);
+    return {
+      details: parsed?.error_description || parsed?.msg || parsed?.message || parsed?.error || rawText,
+      code: parsed?.error_code || parsed?.code || parsed?.error || '',
+    };
+  } catch {
+    return { details: rawText, code: '' };
+  }
+}
+
+function isValidEmail(email) {
+  return /^\S+@\S+\.\S+$/.test(email);
+}
+
 function sanitizePayload(payload) {
   if (!payload || typeof payload !== 'object' || payload instanceof FormData) {
     return payload;
@@ -151,8 +169,10 @@ async function createAuthAdminUser({ email, password, full_name }) {
 
   const authToken = getAdminAuthToken();
   const apiKey = getAdminApiKey();
-  const fallbackPassword =
-    password || `${Math.random().toString(36).slice(2)}A!${Date.now().toString(36)}`;
+
+  if (!password || password.length < 8) {
+    throw new Error('Senha provisória inválida. Informe ao menos 8 caracteres para criar o usuário.');
+  }
 
   const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: 'POST',
@@ -163,7 +183,7 @@ async function createAuthAdminUser({ email, password, full_name }) {
     },
     body: JSON.stringify({
       email,
-      password: fallbackPassword,
+      password,
       email_confirm: true,
       user_metadata: {
         full_name: full_name || '',
@@ -176,7 +196,8 @@ async function createAuthAdminUser({ email, password, full_name }) {
     if (response.status === 401) {
       throw new Error(buildUnauthorizedMessage(text));
     }
-    throw new Error(text || 'Erro ao criar usuário no auth.users');
+    const { details } = parseSupabaseErrorResponse(text);
+    throw new Error(details || 'Erro ao criar usuário no auth.users');
   }
 
   return response.json();
@@ -261,10 +282,14 @@ async function ensureProfileForAuthUser(authUser) {
 async function loginWithPassword({ email, password }) {
   assertSupabaseEnv();
   const normalizedEmail = email?.trim().toLowerCase();
-  const normalizedPassword = typeof password === 'string' ? password.trim() : '';
+  const passwordValue = typeof password === 'string' ? password : '';
 
-  if (!normalizedEmail || !normalizedPassword) {
+  if (!normalizedEmail || !passwordValue) {
     throw new Error('Informe e-mail e senha para continuar.');
+  }
+
+  if (!isValidEmail(normalizedEmail)) {
+    throw new Error('Informe um e-mail válido para continuar.');
   }
 
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -272,22 +297,40 @@ async function loginWithPassword({ email, password }) {
     headers: {
       apikey: SUPABASE_ANON_KEY,
       'Content-Type': 'application/json',
+      Accept: 'application/json',
     },
     body: JSON.stringify({
       email: normalizedEmail,
-      password: normalizedPassword,
+      password: passwordValue,
     }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const text = await response.text();
+  const { details, code } = parseSupabaseErrorResponse(text);
+
   if (!response.ok) {
-    const details = data?.error_description || data?.msg || data?.error || '';
     if (response.status === 400) {
       throw new Error(
-        `Não foi possível autenticar (400). Verifique e-mail/senha e se o usuário possui senha válida no Supabase Auth.${details ? ` Detalhes: ${details}` : ''}`
+        `Não foi possível autenticar (400). Verifique e-mail/senha e confirme se o usuário foi criado com senha no Supabase Auth.${details ? ` Detalhes: ${details}` : ''}`
       );
     }
-    throw new Error(details || 'E-mail ou senha inválidos.');
+
+    if (response.status === 422) {
+      throw new Error(
+        `Dados de login inválidos (422). Revise formato do e-mail/senha e políticas de autenticação.${details ? ` Detalhes: ${details}` : ''}`
+      );
+    }
+
+    throw new Error(details || code || 'E-mail ou senha inválidos.');
+  }
+
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {};
+    }
   }
 
   const accessToken = data?.access_token;
