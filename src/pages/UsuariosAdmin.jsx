@@ -14,6 +14,8 @@ import { useAuth } from '@/context/AuthContext.jsx';
 import { Navigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
+const SUPER_ADMIN_EMAIL = 'welliton.tec@hotmail.com';
+
 const defaultNovoUsuario = {
   full_name: '',
   email: '',
@@ -74,6 +76,10 @@ export default function UsuariosAdmin() {
   });
 
   const handleChangeRole = (usuario, role) => {
+    if ((usuario.email || '').toLowerCase() === SUPER_ADMIN_EMAIL && role !== 'admin') {
+      alert('O administrador geral não pode perder o nível admin.');
+      return;
+    }
     updateRoleMutation.mutate({ id: usuario.id, role });
   };
 
@@ -82,6 +88,11 @@ export default function UsuariosAdmin() {
   };
 
   const handleDelete = (usuario) => {
+    if ((usuario.email || '').toLowerCase() === SUPER_ADMIN_EMAIL) {
+      alert('O administrador geral não pode ser removido.');
+      return;
+    }
+
     if (usuario.id === user?.id) {
       alert('Você não pode remover o próprio usuário enquanto estiver conectado.');
       return;
@@ -214,7 +225,7 @@ export default function UsuariosAdmin() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Select value={usuario.role || 'usuario'} onValueChange={(value) => handleChangeRole(usuario, value)}>
+                        <Select value={usuario.role || 'usuario'} onValueChange={(value) => handleChangeRole(usuario, value)} disabled={(usuario.email || '').toLowerCase() === SUPER_ADMIN_EMAIL}>
                           <SelectTrigger className="w-[180px]">
                             <SelectValue />
                           </SelectTrigger>
@@ -229,7 +240,7 @@ export default function UsuariosAdmin() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(usuario)}
-                          disabled={deleteMutation.isPending}
+                          disabled={deleteMutation.isPending || (usuario.email || '').toLowerCase() === SUPER_ADMIN_EMAIL}
                         >
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>

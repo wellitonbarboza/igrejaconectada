@@ -10,10 +10,13 @@ export const STORAGE_BUCKETS = {
   fotosMembros: 'fotos-membros',
 };
 
+const SUPER_ADMIN_EMAIL =
+  (import.meta.env.VITE_SUPABASE_SUPER_ADMIN_EMAIL || 'welliton.tec@hotmail.com').trim().toLowerCase();
+
 const ADMIN_PROFILE = {
   id: ADMIN_USER_ID,
   full_name: 'Administrador Geral',
-  email: 'admin@igreja.local',
+  email: SUPER_ADMIN_EMAIL,
   role: 'admin',
 };
 const AUTH_TOKEN_STORAGE_KEY = 'igrejaconectada.auth.access_token';
@@ -118,13 +121,21 @@ function setPersistedAccessToken(token) {
 }
 
 function getRuntimeAuthToken() {
-  return getPersistedAccessToken() || getAdminAuthToken();
+  return getPersistedAccessToken();
 }
 
-async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
+function getRequiredAuthToken() {
+  const token = getRuntimeAuthToken();
+  if (!token) {
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+  return token;
+}
+
+async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '', useAdmin = false } = {}) {
   assertSupabaseEnv();
-  const authToken = getRuntimeAuthToken();
-  const apiKey = getAdminApiKey();
+  const authToken = useAdmin ? getAdminAuthToken() : getRequiredAuthToken();
+  const apiKey = useAdmin ? getAdminApiKey() : SUPABASE_ANON_KEY;
   const contentTypeHeader = Object.keys(headers).find(
     (headerName) => headerName.toLowerCase() === 'content-type'
   );
@@ -448,8 +459,22 @@ async function ensureAdminProfile() {
     },
     body: JSON.stringify(payload),
     query: '?on_conflict=id&select=*',
+    useAdmin: true,
   });
   return Array.isArray(data) ? data[0] : data;
+}
+
+
+async function assertAdminForPhotoUpload() {
+  const authUser = await fetchCurrentAuthUser();
+  if (!authUser?.id) {
+    throw new Error('Sessão inválida para upload. Faça login novamente.');
+  }
+
+  const profile = await fetchProfileByUserId(authUser.id);
+  if (profile?.role !== 'admin') {
+    throw new Error('Somente administradores podem enviar fotos.');
+  }
 }
 
 export const base44 = {
@@ -549,8 +574,13 @@ export const base44 = {
         if (!file) {
           throw new Error('Nenhum arquivo selecionado');
         }
-        const authToken = getAdminAuthToken();
-        const apiKey = getAdminApiKey();
+
+        if (bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares) {
+          await assertAdminForPhotoUpload();
+        }
+
+        const authToken = getRequiredAuthToken();
+        const apiKey = SUPABASE_ANON_KEY;
         const extension = file.name?.split('.').pop() || 'bin';
         const fileName =
           path ||
