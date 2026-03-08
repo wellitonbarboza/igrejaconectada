@@ -16,6 +16,7 @@ const ADMIN_PROFILE = {
   email: 'admin@igreja.local',
   role: 'admin',
 };
+const AUTH_TOKEN_STORAGE_KEY = 'igrejaconectada.auth.access_token';
 
 function assertSupabaseEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -79,9 +80,27 @@ function sanitizePayload(payload) {
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
 }
 
+function getPersistedAccessToken() {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+function setPersistedAccessToken(token) {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    return;
+  }
+  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+function getRuntimeAuthToken() {
+  return getPersistedAccessToken() || getAdminAuthToken();
+}
+
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
-  const authToken = getAdminAuthToken();
+  const authToken = getRuntimeAuthToken();
   const apiKey = getAdminApiKey();
   const contentTypeHeader = Object.keys(headers).find(
     (headerName) => headerName.toLowerCase() === 'content-type'
@@ -161,6 +180,115 @@ async function createAuthAdminUser({ email, password, full_name }) {
   }
 
   return response.json();
+}
+
+async function deleteAuthAdminUser(userId) {
+  if (!userId || !SUPABASE_SERVICE_ROLE_KEY) return;
+
+  const authToken = getAdminAuthToken();
+  const apiKey = getAdminApiKey();
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+}
+
+async function fetchCurrentAuthUser() {
+  const accessToken = getPersistedAccessToken();
+  if (!accessToken) return null;
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401) {
+    setPersistedAccessToken(null);
+    return null;
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Não foi possível validar a sessão atual.');
+  }
+
+  return response.json();
+}
+
+async function fetchProfileByUserId(userId) {
+  const profiles = await authenticatedRequest('/rest/v1/profiles', {
+    query: `?select=*&id=eq.${encodeURIComponent(userId)}&limit=1`,
+  });
+  return Array.isArray(profiles) ? profiles[0] || null : profiles;
+}
+
+function mergeAuthAndProfile(authUser, profile) {
+  if (!authUser) return null;
+  return {
+    ...authUser,
+    ...profile,
+    id: authUser.id,
+    email: profile?.email || authUser.email,
+    full_name:
+      profile?.full_name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
+    role: profile?.role || 'usuario',
+    cargo: profile?.cargo || '',
+  };
+}
+
+async function ensureProfileForAuthUser(authUser) {
+  if (!authUser?.id) return null;
+  const existingProfile = await fetchProfileByUserId(authUser.id);
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  return upsertProfileById({
+    id: authUser.id,
+    email: authUser.email || '',
+    full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
+    role: 'usuario',
+    cargo: '',
+  });
+}
+
+async function loginWithPassword({ email, password }) {
+  assertSupabaseEnv();
+  if (!email || !password) {
+    throw new Error('Informe e-mail e senha para continuar.');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+      password,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error_description || data?.msg || 'E-mail ou senha inválidos.');
+  }
+
+  const accessToken = data?.access_token;
+  if (!accessToken || !data?.user?.id) {
+    throw new Error('Não foi possível iniciar a sessão do usuário.');
+  }
+
+  setPersistedAccessToken(accessToken);
+  const profile = await ensureProfileForAuthUser(data.user);
+  return mergeAuthAndProfile(data.user, profile);
 }
 
 async function upsertProfileById(profilePayload) {
@@ -262,12 +390,13 @@ async function ensureAdminProfile() {
 export const base44 = {
   auth: {
     async me() {
-      await ensureAdminProfile();
-      return { ...ADMIN_PROFILE };
+      const authUser = await fetchCurrentAuthUser();
+      if (!authUser) return null;
+      const profile = await ensureProfileForAuthUser(authUser);
+      return mergeAuthAndProfile(authUser, profile);
     },
-    async login() {
-      await ensureAdminProfile();
-      return { ...ADMIN_PROFILE };
+    async login(credentials) {
+      return loginWithPassword(credentials || {});
     },
     async register() {
       throw new Error('Cadastro de usuários desativado.');
@@ -298,20 +427,39 @@ export const base44 = {
         full_name,
       });
 
-      const userId = createdAuthUser?.user?.id;
+      const userId = createdAuthUser?.user?.id || createdAuthUser?.id;
       if (!userId) {
         throw new Error('Não foi possível obter o id do usuário criado no auth.users.');
       }
 
-      return upsertProfileById({
-        id: userId,
-        full_name: full_name || '',
-        email: normalizedEmail,
-        role,
-        cargo,
-      });
+      try {
+        return await upsertProfileById({
+          id: userId,
+          full_name: full_name || '',
+          email: normalizedEmail,
+          role,
+          cargo,
+        });
+      } catch (error) {
+        await deleteAuthAdminUser(userId);
+        throw error;
+      }
     },
     async logout() {
+      const accessToken = getPersistedAccessToken();
+      setPersistedAccessToken(null);
+
+      if (!accessToken) {
+        return null;
+      }
+
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       return null;
     },
   },

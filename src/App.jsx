@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import Login from '@/pages/Login.jsx';
 import Layout from './Layout.jsx';
 import Dashboard from '@/pages/Dashboard.jsx';
 import Membros from '@/pages/Membros.jsx';
@@ -30,14 +31,7 @@ function ProtectedShell() {
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="text-center space-y-2">
-          <p className="text-slate-600">Carregando acesso...</p>
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        </div>
-      </div>
-    );
+    return <Navigate to={createPageUrl('Login')} replace />;
   }
 
   return (
@@ -57,9 +51,28 @@ function ProtectedRoute({ page, children }) {
   return children;
 }
 
+function LoginRoute() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to={createPageUrl('Dashboard')} replace />;
+  }
+
+  return <Login />;
+}
+
 export default function App() {
   return (
     <Routes>
+      <Route path={createPageUrl('Login')} element={<LoginRoute />} />
       <Route element={<ProtectedShell />}>
         <Route index element={<Navigate to={createPageUrl('Dashboard')} replace />} />
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
