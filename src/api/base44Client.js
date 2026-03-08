@@ -91,6 +91,11 @@ function isValidEmail(email) {
   return /^\S+@\S+\.\S+$/.test(email);
 }
 
+function isRlsPermissionError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('42501') || message.includes('row-level security') || message.includes('forbidden');
+}
+
 function sanitizePayload(payload) {
   if (!payload || typeof payload !== 'object' || payload instanceof FormData) {
     return payload;
@@ -270,13 +275,21 @@ async function ensureProfileForAuthUser(authUser) {
     return existingProfile;
   }
 
-  return upsertProfileById({
-    id: authUser.id,
-    email: authUser.email || '',
-    full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
-    role: 'usuario',
-    cargo: '',
-  });
+  try {
+    return await upsertProfileById({
+      id: authUser.id,
+      email: authUser.email || '',
+      full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
+      role: 'usuario',
+      cargo: '',
+    });
+  } catch (error) {
+    if (isRlsPermissionError(error)) {
+      console.warn('RLS bloqueou criação automática do profile. Prosseguindo com perfil local.', error);
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function loginWithPassword({ email, password }) {
