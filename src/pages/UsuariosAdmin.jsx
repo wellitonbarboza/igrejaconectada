@@ -19,6 +19,7 @@ const defaultNovoUsuario = {
   email: '',
   role: 'usuario',
   cargo: '',
+  password: '',
 };
 
 export default function UsuariosAdmin() {
@@ -98,11 +99,17 @@ export default function UsuariosAdmin() {
       return;
     }
 
+    if (!novoUsuario.password.trim() || novoUsuario.password.trim().length < 8) {
+      alert('Defina uma senha provisória com pelo menos 8 caracteres.');
+      return;
+    }
+
     createUserMutation.mutate({
       ...novoUsuario,
       full_name: novoUsuario.full_name.trim(),
       email: novoUsuario.email.trim().toLowerCase(),
       cargo: novoUsuario.cargo.trim(),
+      password: novoUsuario.password.trim(),
     });
   };
 
@@ -260,6 +267,21 @@ export default function UsuariosAdmin() {
                 onChange={(event) => setNovoUsuario((prev) => ({ ...prev, email: event.target.value }))}
                 required
               />
+            </div>
+            <div>
+              <Label htmlFor="password">Senha provisória</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Mínimo 8 caracteres"
+                value={novoUsuario.password}
+                onChange={(event) => setNovoUsuario((prev) => ({ ...prev, password: event.target.value }))}
+                required
+                minLength={8}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Compartilhe esta senha com o usuário de forma segura.
+              </p>
             </div>
             <div>
               <Label htmlFor="cargo">Cargo</Label>

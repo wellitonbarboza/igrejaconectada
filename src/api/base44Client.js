@@ -260,7 +260,10 @@ async function ensureProfileForAuthUser(authUser) {
 
 async function loginWithPassword({ email, password }) {
   assertSupabaseEnv();
-  if (!email || !password) {
+  const normalizedEmail = email?.trim().toLowerCase();
+  const normalizedPassword = typeof password === 'string' ? password.trim() : '';
+
+  if (!normalizedEmail || !normalizedPassword) {
     throw new Error('Informe e-mail e senha para continuar.');
   }
 
@@ -271,14 +274,20 @@ async function loginWithPassword({ email, password }) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email: email.trim().toLowerCase(),
-      password,
+      email: normalizedEmail,
+      password: normalizedPassword,
     }),
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data?.error_description || data?.msg || 'E-mail ou senha inválidos.');
+    const details = data?.error_description || data?.msg || data?.error || '';
+    if (response.status === 400) {
+      throw new Error(
+        `Não foi possível autenticar (400). Verifique e-mail/senha e se o usuário possui senha válida no Supabase Auth.${details ? ` Detalhes: ${details}` : ''}`
+      );
+    }
+    throw new Error(details || 'E-mail ou senha inválidos.');
   }
 
   const accessToken = data?.access_token;
@@ -401,10 +410,15 @@ export const base44 = {
     async register() {
       throw new Error('Cadastro de usuários desativado.');
     },
-    async createUserWithProfile({ full_name, email, role = 'usuario', cargo = '' }) {
+    async createUserWithProfile({ full_name, email, password, role = 'usuario', cargo = '' }) {
       const normalizedEmail = email?.trim().toLowerCase();
+      const normalizedPassword = typeof password === 'string' ? password.trim() : '';
+
       if (!normalizedEmail) {
         throw new Error('E-mail é obrigatório para cadastrar usuário.');
+      }
+      if (!normalizedPassword || normalizedPassword.length < 8) {
+        throw new Error('Defina uma senha provisória com pelo menos 8 caracteres para o novo usuário.');
       }
 
       const profiles = await authenticatedRequest('/rest/v1/profiles', {
@@ -424,6 +438,7 @@ export const base44 = {
 
       const createdAuthUser = await createAuthAdminUser({
         email: normalizedEmail,
+        password: normalizedPassword,
         full_name,
       });
 
