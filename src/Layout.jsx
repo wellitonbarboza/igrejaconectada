@@ -13,6 +13,7 @@ import {
   Menu,
   Mail,
   Settings,
+  LogOut,
 } from 'lucide-react';
 import ieadLogo from '@/assets/iead-logo.svg';
 import {
@@ -32,7 +33,7 @@ import {
 
 export default function Layout({ children }) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   const navigationItems = [
     {
@@ -179,6 +180,14 @@ export default function Layout({ children }) {
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
                 Permissões aplicadas conforme nível de acesso.
               </div>
+              <button
+                type="button"
+                onClick={() => signOut()}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
             </div>
           </SidebarFooter>
         </Sidebar>

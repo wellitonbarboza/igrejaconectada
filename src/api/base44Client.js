@@ -16,6 +16,7 @@ const ADMIN_PROFILE = {
   email: 'admin@igreja.local',
   role: 'admin',
 };
+const AUTH_TOKEN_STORAGE_KEY = 'igrejaconectada.auth.access_token';
 
 function assertSupabaseEnv() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -72,6 +73,29 @@ function buildUnauthorizedMessage(details) {
   );
 }
 
+function parseSupabaseErrorResponse(rawText) {
+  if (!rawText) return { details: '', code: '' };
+
+  try {
+    const parsed = JSON.parse(rawText);
+    return {
+      details: parsed?.error_description || parsed?.msg || parsed?.message || parsed?.error || rawText,
+      code: parsed?.error_code || parsed?.code || parsed?.error || '',
+    };
+  } catch {
+    return { details: rawText, code: '' };
+  }
+}
+
+function isValidEmail(email) {
+  return /^\S+@\S+\.\S+$/.test(email);
+}
+
+function isRlsPermissionError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('42501') || message.includes('row-level security') || message.includes('forbidden');
+}
+
 function sanitizePayload(payload) {
   if (!payload || typeof payload !== 'object' || payload instanceof FormData) {
     return payload;
@@ -79,9 +103,27 @@ function sanitizePayload(payload) {
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
 }
 
+function getPersistedAccessToken() {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+function setPersistedAccessToken(token) {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    return;
+  }
+  window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+function getRuntimeAuthToken() {
+  return getPersistedAccessToken() || getAdminAuthToken();
+}
+
 async function authenticatedRequest(path, { method = 'GET', body, headers = {}, query = '' } = {}) {
   assertSupabaseEnv();
-  const authToken = getAdminAuthToken();
+  const authToken = getRuntimeAuthToken();
   const apiKey = getAdminApiKey();
   const contentTypeHeader = Object.keys(headers).find(
     (headerName) => headerName.toLowerCase() === 'content-type'
@@ -132,8 +174,10 @@ async function createAuthAdminUser({ email, password, full_name }) {
 
   const authToken = getAdminAuthToken();
   const apiKey = getAdminApiKey();
-  const fallbackPassword =
-    password || `${Math.random().toString(36).slice(2)}A!${Date.now().toString(36)}`;
+
+  if (!password || password.length < 8) {
+    throw new Error('Senha provisória inválida. Informe ao menos 8 caracteres para criar o usuário.');
+  }
 
   const response = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
     method: 'POST',
@@ -144,7 +188,7 @@ async function createAuthAdminUser({ email, password, full_name }) {
     },
     body: JSON.stringify({
       email,
-      password: fallbackPassword,
+      password,
       email_confirm: true,
       user_metadata: {
         full_name: full_name || '',
@@ -157,10 +201,159 @@ async function createAuthAdminUser({ email, password, full_name }) {
     if (response.status === 401) {
       throw new Error(buildUnauthorizedMessage(text));
     }
-    throw new Error(text || 'Erro ao criar usuário no auth.users');
+    const { details } = parseSupabaseErrorResponse(text);
+    throw new Error(details || 'Erro ao criar usuário no auth.users');
   }
 
   return response.json();
+}
+
+async function deleteAuthAdminUser(userId) {
+  if (!userId || !SUPABASE_SERVICE_ROLE_KEY) return;
+
+  const authToken = getAdminAuthToken();
+  const apiKey = getAdminApiKey();
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${authToken}`,
+    },
+  });
+}
+
+async function fetchCurrentAuthUser() {
+  const accessToken = getPersistedAccessToken();
+  if (!accessToken) return null;
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401) {
+    setPersistedAccessToken(null);
+    return null;
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Não foi possível validar a sessão atual.');
+  }
+
+  return response.json();
+}
+
+async function fetchProfileByUserId(userId) {
+  const profiles = await authenticatedRequest('/rest/v1/profiles', {
+    query: `?select=*&id=eq.${encodeURIComponent(userId)}&limit=1`,
+  });
+  return Array.isArray(profiles) ? profiles[0] || null : profiles;
+}
+
+function mergeAuthAndProfile(authUser, profile) {
+  if (!authUser) return null;
+  return {
+    ...authUser,
+    ...profile,
+    id: authUser.id,
+    email: profile?.email || authUser.email,
+    full_name:
+      profile?.full_name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
+    role: profile?.role || 'usuario',
+    cargo: profile?.cargo || '',
+  };
+}
+
+async function ensureProfileForAuthUser(authUser) {
+  if (!authUser?.id) return null;
+  const existingProfile = await fetchProfileByUserId(authUser.id);
+
+  if (existingProfile) {
+    return existingProfile;
+  }
+
+  try {
+    return await upsertProfileById({
+      id: authUser.id,
+      email: authUser.email || '',
+      full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
+      role: 'usuario',
+      cargo: '',
+    });
+  } catch (error) {
+    if (isRlsPermissionError(error)) {
+      console.warn('RLS bloqueou criação automática do profile. Prosseguindo com perfil local.', error);
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function loginWithPassword({ email, password }) {
+  assertSupabaseEnv();
+  const normalizedEmail = email?.trim().toLowerCase();
+  const passwordValue = typeof password === 'string' ? password : '';
+
+  if (!normalizedEmail || !passwordValue) {
+    throw new Error('Informe e-mail e senha para continuar.');
+  }
+
+  if (!isValidEmail(normalizedEmail)) {
+    throw new Error('Informe um e-mail válido para continuar.');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      email: normalizedEmail,
+      password: passwordValue,
+    }),
+  });
+
+  const text = await response.text();
+  const { details, code } = parseSupabaseErrorResponse(text);
+
+  if (!response.ok) {
+    if (response.status === 400) {
+      throw new Error(
+        `Não foi possível autenticar (400). Verifique e-mail/senha e confirme se o usuário foi criado com senha no Supabase Auth.${details ? ` Detalhes: ${details}` : ''}`
+      );
+    }
+
+    if (response.status === 422) {
+      throw new Error(
+        `Dados de login inválidos (422). Revise formato do e-mail/senha e políticas de autenticação.${details ? ` Detalhes: ${details}` : ''}`
+      );
+    }
+
+    throw new Error(details || code || 'E-mail ou senha inválidos.');
+  }
+
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {};
+    }
+  }
+
+  const accessToken = data?.access_token;
+  if (!accessToken || !data?.user?.id) {
+    throw new Error('Não foi possível iniciar a sessão do usuário.');
+  }
+
+  setPersistedAccessToken(accessToken);
+  const profile = await ensureProfileForAuthUser(data.user);
+  return mergeAuthAndProfile(data.user, profile);
 }
 
 async function upsertProfileById(profilePayload) {
@@ -262,20 +455,26 @@ async function ensureAdminProfile() {
 export const base44 = {
   auth: {
     async me() {
-      await ensureAdminProfile();
-      return { ...ADMIN_PROFILE };
+      const authUser = await fetchCurrentAuthUser();
+      if (!authUser) return null;
+      const profile = await ensureProfileForAuthUser(authUser);
+      return mergeAuthAndProfile(authUser, profile);
     },
-    async login() {
-      await ensureAdminProfile();
-      return { ...ADMIN_PROFILE };
+    async login(credentials) {
+      return loginWithPassword(credentials || {});
     },
     async register() {
       throw new Error('Cadastro de usuários desativado.');
     },
-    async createUserWithProfile({ full_name, email, role = 'usuario', cargo = '' }) {
+    async createUserWithProfile({ full_name, email, password, role = 'usuario', cargo = '' }) {
       const normalizedEmail = email?.trim().toLowerCase();
+      const normalizedPassword = typeof password === 'string' ? password.trim() : '';
+
       if (!normalizedEmail) {
         throw new Error('E-mail é obrigatório para cadastrar usuário.');
+      }
+      if (!normalizedPassword || normalizedPassword.length < 8) {
+        throw new Error('Defina uma senha provisória com pelo menos 8 caracteres para o novo usuário.');
       }
 
       const profiles = await authenticatedRequest('/rest/v1/profiles', {
@@ -295,23 +494,43 @@ export const base44 = {
 
       const createdAuthUser = await createAuthAdminUser({
         email: normalizedEmail,
+        password: normalizedPassword,
         full_name,
       });
 
-      const userId = createdAuthUser?.user?.id;
+      const userId = createdAuthUser?.user?.id || createdAuthUser?.id;
       if (!userId) {
         throw new Error('Não foi possível obter o id do usuário criado no auth.users.');
       }
 
-      return upsertProfileById({
-        id: userId,
-        full_name: full_name || '',
-        email: normalizedEmail,
-        role,
-        cargo,
-      });
+      try {
+        return await upsertProfileById({
+          id: userId,
+          full_name: full_name || '',
+          email: normalizedEmail,
+          role,
+          cargo,
+        });
+      } catch (error) {
+        await deleteAuthAdminUser(userId);
+        throw error;
+      }
     },
     async logout() {
+      const accessToken = getPersistedAccessToken();
+      setPersistedAccessToken(null);
+
+      if (!accessToken) {
+        return null;
+      }
+
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       return null;
     },
   },
