@@ -264,6 +264,15 @@ async function fetchProfileByUserId(userId) {
   return Array.isArray(profiles) ? profiles[0] || null : profiles;
 }
 
+async function fetchProfileByEmail(email) {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) return null;
+  const profiles = await authenticatedRequest('/rest/v1/profiles', {
+    query: `?select=*&email=eq.${encodeURIComponent(normalizedEmail)}&limit=1`,
+  });
+  return Array.isArray(profiles) ? profiles[0] || null : profiles;
+}
+
 function mergeAuthAndProfile(authUser, profile) {
   if (!authUser) return null;
   return {
@@ -286,6 +295,11 @@ async function ensureProfileForAuthUser(authUser) {
     return existingProfile;
   }
 
+  const profileByEmail = await fetchProfileByEmail(authUser.email || '');
+  if (profileByEmail) {
+    return profileByEmail;
+  }
+
   try {
     return await upsertProfileById({
       id: authUser.id,
@@ -299,6 +313,14 @@ async function ensureProfileForAuthUser(authUser) {
       console.warn('RLS bloqueou criação automática do profile. Prosseguindo com perfil local.', error);
       return null;
     }
+
+    const message = String(error?.message || '').toLowerCase();
+    const isEmailConflict = message.includes('profiles_email_unique') || message.includes('duplicate key value');
+    if (isEmailConflict) {
+      console.warn('Conflito de e-mail no bootstrap de profile. Usando profile existente por e-mail.', error);
+      return fetchProfileByEmail(authUser.email || '');
+    }
+
     throw error;
   }
 }
