@@ -3,7 +3,7 @@ import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { compressImage } from '@/utils/imageCompression';
 import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
+import { X, Upload, Camera, Mic, MicOff, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -265,6 +265,12 @@ export default function ModalMembro({
   const handleFotoFileChange = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
+
+    if (!isAdmin) {
+      setUploadError('Somente administradores podem fazer upload de fotos.');
+      return;
+    }
+
     if (!file) return;
     const validationError = validateFotoFile(file);
     if (validationError) {
@@ -300,7 +306,7 @@ export default function ModalMembro({
         });
 
         const createdRecord = Array.isArray(createdMembro) ? createdMembro[0] : createdMembro;
-        if (pendingFotoFile && createdRecord?.id) {
+        if (isAdmin && pendingFotoFile && createdRecord?.id) {
           const { file_url, filePath } = await uploadFotoFile(pendingFotoFile, createdRecord.id);
           await base44.entities.Membro.update(createdRecord.id, {
             foto_url: file_url,
@@ -311,7 +317,7 @@ export default function ModalMembro({
 
       } else {
         let payload = dataToSave;
-        if (pendingFotoFile) {
+        if (isAdmin && pendingFotoFile) {
           const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
           payload = {
             ...payload,
@@ -672,7 +678,7 @@ export default function ModalMembro({
                       type="button"
                       variant="outline"
                       onClick={() => document.getElementById('foto-upload').click()}
-                      disabled={uploading}
+                      disabled={uploading || !isAdmin}
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       {uploading ? 'Enviando...' : 'Carregar Arquivo'}
@@ -681,13 +687,19 @@ export default function ModalMembro({
                       type="button"
                       variant="outline"
                       onClick={() => document.getElementById('foto-camera').click()}
-                      disabled={uploading}
+                      disabled={uploading || !isAdmin}
                     >
                       <Camera className="w-4 h-4 mr-2" />
                       {uploading ? 'Enviando...' : 'Usar Câmera'}
                     </Button>
                   </div>
                   <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG ou WEBP. Tamanho máximo: 5MB</p>
+                  {!isAdmin && (
+                    <p className="text-xs text-amber-700 mt-2 inline-flex items-center gap-1">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      Somente administradores podem salvar foto de membro.
+                    </p>
+                  )}
                   {uploadError && <p className="text-sm text-red-600 mt-1">{uploadError}</p>}
                 </div>
               </div>
