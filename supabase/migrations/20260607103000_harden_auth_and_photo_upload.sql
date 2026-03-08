@@ -21,74 +21,105 @@ begin
 end $$;
 
 -- 3) Restringir upload de fotos para administradores.
-alter table storage.objects enable row level security;
+-- Alguns ambientes Supabase executam migrations com um role que não é owner de `storage.objects`.
+-- Para evitar falha da migration, aplicamos as policies apenas quando o usuário atual é o owner.
+do $$
+declare
+  objects_owner text;
+begin
+  select pg_catalog.pg_get_userbyid(c.relowner)
+    into objects_owner
+  from pg_catalog.pg_class c
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'storage'
+    and c.relname = 'objects'
+    and c.relkind = 'r';
 
--- Limpa políticas antigas que possam conflitar.
-drop policy if exists "storage_public_read" on storage.objects;
-drop policy if exists "storage_upload_authenticated" on storage.objects;
-drop policy if exists "storage_update_admin" on storage.objects;
-drop policy if exists "storage_delete_admin" on storage.objects;
-drop policy if exists "storage_photo_upload_admin" on storage.objects;
-drop policy if exists "storage_photo_update_admin" on storage.objects;
-drop policy if exists "storage_photo_delete_admin" on storage.objects;
+  if objects_owner is null then
+    raise notice 'Tabela storage.objects não encontrada. Pulando configuração de policies de storage.';
+    return;
+  end if;
 
--- Leitura pública para buckets públicos.
-create policy "storage_public_read"
-on storage.objects
-for select
-using (
-  bucket_id in ('fotos-membros', 'avatares', 'documentos')
-);
+  if objects_owner <> current_user then
+    raise notice 'Sem ownership em storage.objects (owner=% , current_user=%). Pulando policies de storage nesta migration.', objects_owner, current_user;
+    return;
+  end if;
 
--- Upload autenticado para documentos (não-foto).
-create policy "storage_upload_authenticated"
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id = 'documentos'
-);
+  execute 'alter table storage.objects enable row level security';
 
--- Upload de foto apenas para admin.
-create policy "storage_photo_upload_admin"
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-);
+  execute 'drop policy if exists "storage_public_read" on storage.objects';
+  execute 'drop policy if exists "storage_upload_authenticated" on storage.objects';
+  execute 'drop policy if exists "storage_update_admin" on storage.objects';
+  execute 'drop policy if exists "storage_delete_admin" on storage.objects';
+  execute 'drop policy if exists "storage_photo_upload_admin" on storage.objects';
+  execute 'drop policy if exists "storage_photo_update_admin" on storage.objects';
+  execute 'drop policy if exists "storage_photo_delete_admin" on storage.objects';
 
-create policy "storage_photo_update_admin"
-on storage.objects
-for update
-to authenticated
-using (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-)
-with check (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-);
+  execute $policy$
+    create policy "storage_public_read"
+    on storage.objects
+    for select
+    using (
+      bucket_id in ('fotos-membros', 'avatares', 'documentos')
+    )
+  $policy$;
 
-create policy "storage_photo_delete_admin"
-on storage.objects
-for delete
-to authenticated
-using (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-);
+  execute $policy$
+    create policy "storage_upload_authenticated"
+    on storage.objects
+    for insert
+    to authenticated
+    with check (
+      bucket_id = 'documentos'
+    )
+  $policy$;
+
+  execute $policy$
+    create policy "storage_photo_upload_admin"
+    on storage.objects
+    for insert
+    to authenticated
+    with check (
+      bucket_id in ('fotos-membros', 'avatares')
+      and exists (
+        select 1 from public.profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  $policy$;
+
+  execute $policy$
+    create policy "storage_photo_update_admin"
+    on storage.objects
+    for update
+    to authenticated
+    using (
+      bucket_id in ('fotos-membros', 'avatares')
+      and exists (
+        select 1 from public.profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+    with check (
+      bucket_id in ('fotos-membros', 'avatares')
+      and exists (
+        select 1 from public.profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  $policy$;
+
+  execute $policy$
+    create policy "storage_photo_delete_admin"
+    on storage.objects
+    for delete
+    to authenticated
+    using (
+      bucket_id in ('fotos-membros', 'avatares')
+      and exists (
+        select 1 from public.profiles p
+        where p.id = auth.uid() and p.role = 'admin'
+      )
+    )
+  $policy$;
+end $$;
