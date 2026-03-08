@@ -41,6 +41,7 @@ import {
 import ModalMembro from '@/components/membros/ModalMembro.jsx';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
+import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 
 export default function Membros() {
   const navigate = useNavigate();
@@ -303,11 +304,19 @@ export default function Membros() {
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                              <span className="text-white font-semibold text-sm">
-                                {membro.nome_completo?.charAt(0)}
-                              </span>
-                            </div>
+                            {resolveMemberPhotoUrl(membro) ? (
+                              <img
+                                src={resolveMemberPhotoUrl(membro)}
+                                alt={`Foto de ${membro.nome_completo}`}
+                                className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
+                                <span className="text-white font-semibold text-sm">
+                                  {membro.nome_completo?.charAt(0)}
+                                </span>
+                              </div>
+                            )}
                             <div>
                               <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
                               {membro.email && (

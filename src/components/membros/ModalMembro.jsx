@@ -294,6 +294,11 @@ export default function ModalMembro({
     setUploadError('');
 
     const dataToSave = { ...formData };
+    if (!isAdmin && membro) {
+      dataToSave.foto_url = membro.foto_url || '';
+      dataToSave.foto_path = membro.foto_path || '';
+      dataToSave.foto_bucket = membro.foto_bucket || STORAGE_BUCKETS.fotosMembros;
+    }
     setUploading(true);
 
     try {
@@ -570,7 +575,8 @@ export default function ModalMembro({
     setFotoEditorZoom(1);
   };
 
-  const fotoPreview = pendingFotoPreview || formData.foto_url;
+  const currentFotoUrl = resolveMemberPhotoUrl(formData);
+  const fotoPreview = pendingFotoPreview || currentFotoUrl;
 
   useEffect(() => {
     const cepDigits = (formData.cep || '').replace(/\D/g, '');
@@ -638,12 +644,13 @@ export default function ModalMembro({
                       alt="Foto"
                       className="w-24 h-24 rounded-full object-cover border-2 border-slate-200"
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (pendingFotoPreview) {
-                          URL.revokeObjectURL(pendingFotoPreview);
-                        }
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (pendingFotoPreview) {
+                            URL.revokeObjectURL(pendingFotoPreview);
+                          }
                           setPendingFotoFile(null);
                           setPendingFotoPreview('');
                           updateFormData((prev) => ({
@@ -653,10 +660,11 @@ export default function ModalMembro({
                             foto_bucket: STORAGE_BUCKETS.fotosMembros,
                           }));
                         }}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
