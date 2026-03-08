@@ -40,8 +40,8 @@ export function AuthProvider({ children }) {
     };
   }, [refresh]);
 
-  const signIn = useCallback(async ({ password }) => {
-    const loggedUser = await base44.auth.login({ password });
+  const signIn = useCallback(async ({ email, password }) => {
+    const loggedUser = await base44.auth.login({ email, password });
     setUser(loggedUser);
     return loggedUser;
   }, []);
@@ -54,8 +54,7 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     await base44.auth.logout();
-    const currentUser = await base44.auth.me();
-    setUser(currentUser);
+    setUser(null);
   }, []);
 
   const value = useMemo(

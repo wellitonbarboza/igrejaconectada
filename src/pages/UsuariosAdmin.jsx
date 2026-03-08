@@ -46,7 +46,8 @@ export default function UsuariosAdmin() {
     },
     onError: (error) => {
       console.error('Erro ao salvar usuário:', error);
-      alert('Não foi possível salvar o usuário. Verifique se a service role está configurada e se o e-mail já não está em uso.');
+      const detalhe = error?.message ? ` Detalhes: ${error.message}` : '';
+      alert(`Não foi possível salvar o usuário.${detalhe}`);
     },
   });
 
