@@ -146,46 +146,73 @@ export default function Cartas() {
     }
   };
 
+  const getHistoricoSaveErrorMessage = (error) => {
+    const mensagemErro = String(error?.message || '').toLowerCase();
+
+    if (mensagemErro.includes('cartas_emitidas') && mensagemErro.includes('does not exist')) {
+      return 'Não foi possível salvar no histórico porque a tabela "cartas_emitidas" não existe neste banco. Aplique as migrations de cartas no Supabase.';
+    }
+
+    if (mensagemErro.includes('emitido_por') && mensagemErro.includes('does not exist')) {
+      return 'A coluna "emitido_por" não existe na tabela "cartas_emitidas". Aplique a migration 20250615113000_add_emitido_por_cartas_emitidas.sql.';
+    }
+
+    if (mensagemErro.includes('permission denied') || mensagemErro.includes('row-level security') || mensagemErro.includes('42501')) {
+      return 'Sem permissão para gravar em "cartas_emitidas". Verifique as policies RLS/grants do Supabase para usuários autenticados.';
+    }
+
+    return 'Não foi possível salvar a carta no histórico. Verifique permissões do banco e migrations pendentes.';
+  };
+
   const handleImprimir = async () => {
+    if (!cartaRef.current || !membroSelecionado) {
+      window.print();
+      return;
+    }
+
+    let snapshot = null;
     try {
-      if (cartaRef.current && membroSelecionado) {
-        const snapshot = await uploadElementSnapshot({
-          element: cartaRef.current,
-          fileNamePrefix: `carta-${membroSelecionado.id}`,
-          bucket: STORAGE_BUCKETS.documentos,
-        });
+      snapshot = await uploadElementSnapshot({
+        element: cartaRef.current,
+        fileNamePrefix: `carta-${membroSelecionado.id}`,
+        bucket: STORAGE_BUCKETS.documentos,
+      });
+    } catch (snapshotError) {
+      console.error('Falha ao enviar snapshot da carta para o Storage:', snapshotError);
+      window.alert('A carta será impressa normalmente, mas o arquivo não pôde ser enviado ao Storage. O histórico será salvo sem anexo.');
+    }
 
-        const emitidoPor = user?.full_name || user?.email || 'Sistema';
+    try {
+      const emitidoPor = user?.full_name || user?.email || 'Sistema';
 
-        const historicoPayload = {
-          tipo_carta: tipoCarta,
-          membro_id: membroSelecionado.id,
-          membro_nome: membroSelecionado.nome_completo,
-          incluir_familia: incluirFamilia,
-          cidade_destino: cidadeDestino,
-          estado_destino: estadoDestino,
-          funcao_ministerial: funcaoMinisterial,
-          congregacao_id: membroSelecionado.congregacao_id || null,
-          congregacao_nome: membroSelecionado.congregacao_nome || null,
-          igreja_nome: config?.nome_igreja || null,
-          pastor_presidente: config?.pastor_presidente || null,
-          emitida_em: new Date().toISOString(),
-          emitido_por: emitidoPor,
-          arquivo_bucket: STORAGE_BUCKETS.documentos,
-          arquivo_path: snapshot?.path || null,
-          arquivo_url: snapshot?.file_url || null,
-        };
+      const historicoPayload = {
+        tipo_carta: tipoCarta,
+        membro_id: membroSelecionado.id,
+        membro_nome: membroSelecionado.nome_completo,
+        incluir_familia: incluirFamilia,
+        cidade_destino: cidadeDestino,
+        estado_destino: estadoDestino,
+        funcao_ministerial: funcaoMinisterial,
+        congregacao_id: membroSelecionado.congregacao_id || null,
+        congregacao_nome: membroSelecionado.congregacao_nome || null,
+        igreja_nome: config?.nome_igreja || null,
+        pastor_presidente: config?.pastor_presidente || null,
+        emitida_em: new Date().toISOString(),
+        emitido_por: emitidoPor,
+        arquivo_bucket: snapshot ? STORAGE_BUCKETS.documentos : null,
+        arquivo_path: snapshot?.path || null,
+        arquivo_url: snapshot?.file_url || null,
+      };
 
-        await saveHistoricoMutation.mutateAsync({
-          historicoId: historicoEditando,
-          payload: historicoPayload,
-        });
+      await saveHistoricoMutation.mutateAsync({
+        historicoId: historicoEditando,
+        payload: historicoPayload,
+      });
 
-        setHistoricoEditando(null);
-      }
+      setHistoricoEditando(null);
     } catch (error) {
       console.error('Erro ao salvar a carta no histórico:', error);
-      window.alert('Não foi possível salvar a carta no histórico. Verifique se a tabela cartas_emitidas já foi criada no Supabase.');
+      window.alert(getHistoricoSaveErrorMessage(error));
     }
 
     window.print();
@@ -205,13 +232,15 @@ export default function Cartas() {
       transferencia: 'CARTA DE TRANSFERÊNCIA',
     };
 
+    const cidadeIgreja = config.cidade && config.estado ? `${config.cidade}/${config.estado}` : '____________________';
+
     return (
-      <div className="bg-white p-6 md:p-8 max-w-4xl mx-auto shadow-2xl print:shadow-none print:p-4 print:max-w-none print:h-[265mm] print:overflow-hidden">
-        <div className="text-center mb-8 pb-5 border-b border-slate-300">
+      <div className="bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto px-[14mm] py-[12mm] shadow-2xl print:shadow-none print:p-[12mm] print:max-w-none print:min-h-[297mm]">
+        <div className="text-center mb-7 pb-4 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
             alt="Logo"
-            className="h-20 mx-auto mb-3"
+            className="h-16 mx-auto mb-3"
           />
           <h1 className="text-2xl font-bold text-slate-900 mb-1">{config.nome_igreja}</h1>
           <div className="text-sm text-slate-600 space-y-1">
@@ -228,9 +257,9 @@ export default function Cartas() {
           </div>
         </div>
 
-        <div className="flex flex-col h-full">
-          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-6.5' : 'space-y-4 leading-7'}`}>
-            <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide">{tipoCartaTitulo[tipoCarta]}</h2>
+        <div className="flex flex-col min-h-[calc(297mm-56mm)]">
+          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-7' : 'space-y-5 leading-8'} text-[15px]`}>
+            <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide mb-2">{tipoCartaTitulo[tipoCarta]}</h2>
 
             {modoFormularioImpresso ? (
               <>
@@ -241,7 +270,7 @@ export default function Cartas() {
                 <div>
                   <p>o(a) irmão(ã):</p>
                   <p className="border-b border-slate-400 mt-2 pb-1">{nomeCompleto}</p>
-                  <p className="mt-3">que congrega em Santa Tereza do Oeste - PR.</p>
+                  <p className="mt-3">que congrega nesta localidade.</p>
                 </div>
                 <div>
                   <p>O(A) irmão(ã) serve ao Senhor como:</p>
@@ -255,7 +284,7 @@ export default function Cartas() {
                   <strong>{estadoDestino || '__'}</strong>.
                 </p>
                 <p className="text-justify">
-                  o(a) irmão(ã): <strong>{nomeCompleto}</strong>, que congrega em Santa Tereza do Oeste - PR.
+                  o(a) irmão(ã): <strong>{nomeCompleto}</strong>, que congrega nesta localidade.
                 </p>
                 <p className="text-justify">
                   O(A) irmão(ã) serve ao Senhor como: <strong>{funcaoMinisterial || '________________________________________'}</strong>.
@@ -265,14 +294,14 @@ export default function Cartas() {
 
             <p className="text-justify">Portanto, pedimos que o(a) recebais no Senhor como usam fazer os santos.</p>
 
-            <p>
-              Santa Tereza do Oeste/PR, <strong>{dataAtual}</strong>.
+            <p className="pt-2">
+              {cidadeIgreja}, <strong>{dataAtual}</strong>.
             </p>
 
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-8 space-y-5">
+          <div className="mt-auto pt-10 space-y-6">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -286,7 +315,7 @@ export default function Cartas() {
             </div>
 
             <div className="text-center">
-              <p className="text-lg font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
+              <p className="text-base font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
               <p className="text-xs text-slate-500 mt-1">I Samuel 7:12b.</p>
             </div>
           </div>
@@ -300,7 +329,7 @@ export default function Cartas() {
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 6mm;
+          margin: 0;
         }
 
         @media print {
@@ -323,10 +352,8 @@ export default function Cartas() {
           }
 
           .print-area {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
+            width: 210mm;
+            min-height: 297mm;
             margin: 0 !important;
             padding: 0 !important;
             page-break-inside: avoid;
