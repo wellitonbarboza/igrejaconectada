@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mail, Search, FileText, Download, UserCheck, Pencil, Trash2, History, Save, Printer } from 'lucide-react';
@@ -35,6 +35,8 @@ export default function Cartas() {
   const [showPreview, setShowPreview] = useState(false);
   const [acaoPendente, setAcaoPendente] = useState(null);
   const cartaRef = useRef(null);
+  const lastSavedSignatureRef = useRef(null);
+  const lastSavedHistoricoIdRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -100,6 +102,8 @@ export default function Cartas() {
     setEstadoDestino('');
     setFuncaoMinisterial('');
     setIncluirFamilia(false);
+    lastSavedSignatureRef.current = null;
+    lastSavedHistoricoIdRef.current = null;
   };
 
   const carregarCartaParaEdicao = (cartaHistorico) => {
@@ -116,6 +120,18 @@ export default function Cartas() {
     setFuncaoMinisterial(cartaHistorico.funcao_ministerial || '');
     setIncluirFamilia(Boolean(cartaHistorico.incluir_familia));
     setHistoricoEditando(cartaHistorico.id);
+    lastSavedSignatureRef.current = JSON.stringify({
+      tipoCarta: cartaHistorico.tipo_carta || 'recomendacao',
+      membroId: membro.id,
+      incluirFamilia: Boolean(cartaHistorico.incluir_familia),
+      cidadeDestino: cartaHistorico.cidade_destino || '',
+      estadoDestino: cartaHistorico.estado_destino || '',
+      funcaoMinisterial: cartaHistorico.funcao_ministerial || '',
+      modoFormularioImpresso,
+      igrejaNome: config?.nome_igreja || '',
+      pastorPresidente: config?.pastor_presidente || '',
+    });
+    lastSavedHistoricoIdRef.current = cartaHistorico.id;
     setShowPreview(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -164,8 +180,34 @@ export default function Cartas() {
     return 'Não foi possível salvar a carta no histórico. Verifique permissões do banco e migrations pendentes.';
   };
 
+  const getCartaSignature = () => {
+    if (!membroSelecionado) return null;
+
+    return JSON.stringify({
+      tipoCarta,
+      membroId: membroSelecionado.id,
+      incluirFamilia,
+      cidadeDestino: cidadeDestino.trim(),
+      estadoDestino: estadoDestino.trim(),
+      funcaoMinisterial: funcaoMinisterial.trim(),
+      modoFormularioImpresso,
+      igrejaNome: config?.nome_igreja || '',
+      pastorPresidente: config?.pastor_presidente || '',
+    });
+  };
+
   const salvarCartaNoHistorico = async () => {
-    if (!membroSelecionado) return false;
+    if (!membroSelecionado) return { saved: false, skipped: true };
+
+    const assinaturaAtual = getCartaSignature();
+    const assinaturaJaSalva = assinaturaAtual && assinaturaAtual === lastSavedSignatureRef.current;
+    const mesmoRegistro =
+      (!historicoEditando && !lastSavedHistoricoIdRef.current) ||
+      (historicoEditando && historicoEditando === lastSavedHistoricoIdRef.current);
+
+    if (assinaturaJaSalva && mesmoRegistro) {
+      return { saved: true, skipped: true };
+    }
 
     try {
       const emitidoPor = user?.full_name || user?.email || 'Sistema';
@@ -189,17 +231,20 @@ export default function Cartas() {
         arquivo_url: null,
       };
 
-      await saveHistoricoMutation.mutateAsync({
+      const result = await saveHistoricoMutation.mutateAsync({
         historicoId: historicoEditando,
         payload: historicoPayload,
       });
 
-      setHistoricoEditando(null);
-      return true;
+      const registroSalvo = Array.isArray(result) ? result[0] : result;
+      lastSavedSignatureRef.current = assinaturaAtual;
+      lastSavedHistoricoIdRef.current = registroSalvo?.id || historicoEditando || null;
+      setHistoricoEditando(registroSalvo?.id || null);
+      return { saved: true, skipped: false };
     } catch (error) {
       console.error('Erro ao salvar a carta no histórico:', error);
       window.alert(getHistoricoSaveErrorMessage(error));
-      return false;
+      return { saved: false, skipped: false };
     }
   };
 
@@ -320,57 +365,39 @@ export default function Cartas() {
       const link = document.createElement('a');
       link.href = url;
       link.download = nomeArquivo;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch (error) {
       console.error('Erro ao gerar PDF da carta:', error);
       window.alert('Não foi possível baixar o PDF da carta. Tente novamente.');
     }
   };
 
-  const executarAcaoCarta = (acao) => {
-    setShowPreview(true);
-    setAcaoPendente(acao);
+  const executarAcaoCarta = async (acao) => {
+    if (!membroSelecionado || !config) {
+      window.alert('Selecione o membro e confirme as configurações antes de continuar.');
+      return;
+    }
+
+    if (!showPreview) {
+      setShowPreview(true);
+      await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+    }
+
+    const saveResult = await salvarCartaNoHistorico();
+    if (!saveResult.saved) return;
+
+    if (acao === 'imprimir') {
+      imprimirCarta();
+      return;
+    }
+
+    if (acao === 'baixar') {
+      await baixarCartaPdf();
+    }
   };
-
-  useEffect(() => {
-    if (!showPreview || !acaoPendente) return;
-
-    const timer = setTimeout(async () => {
-      if (acaoPendente === 'salvar') {
-        await salvarCartaNoHistorico();
-      }
-
-      if (acaoPendente === 'imprimir') {
-        await salvarCartaNoHistorico();
-        imprimirCarta();
-      }
-
-      if (acaoPendente === 'baixar') {
-        await salvarCartaNoHistorico();
-        await baixarCartaPdf();
-      }
-
-      setAcaoPendente(null);
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [
-    acaoPendente,
-    cidadeDestino,
-    config?.nome_igreja,
-    config?.pastor_presidente,
-    estadoDestino,
-    funcaoMinisterial,
-    historicoEditando,
-    incluirFamilia,
-    membroSelecionado,
-    saveHistoricoMutation,
-    showPreview,
-    tipoCarta,
-    user?.email,
-    user?.full_name,
-  ]);
 
   const CartaTemplate = () => {
     if (!membroSelecionado || !config) return null;
@@ -411,7 +438,7 @@ export default function Cartas() {
           </div>
         </div>
 
-        <div className="flex flex-col min-h-[calc(297mm-56mm)]">
+        <div className="flex flex-col">
           <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-7' : 'space-y-5 leading-8'} text-[15px]`}>
             <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide mb-2">{tipoCartaTitulo[tipoCarta]}</h2>
 
@@ -455,7 +482,7 @@ export default function Cartas() {
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-10 space-y-6">
+          <div className="pt-8 space-y-6">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -492,7 +519,6 @@ export default function Cartas() {
             height: 297mm;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
@@ -525,12 +551,6 @@ export default function Cartas() {
             </h1>
             <p className="text-slate-500 mt-1">Emita cartas de recomendação, mudança e transferência para membros</p>
           </div>
-          {showPreview && (
-            <Button onClick={() => executarAcaoCarta('baixar')} className="bg-gradient-to-r from-blue-500 to-purple-600">
-              <Download className="w-4 h-4 mr-2" />
-              Baixar Carta
-            </Button>
-          )}
         </div>
 
         {!showPreview ? (
@@ -670,22 +690,6 @@ export default function Cartas() {
                     <UserCheck className="w-4 h-4 mr-2" />
                     {historicoEditando ? 'Atualizar Carta' : 'Gerar Carta'}
                   </Button>
-                  <Button
-                    onClick={() => executarAcaoCarta('salvar')}
-                    disabled={!membroSelecionado || !config || saveHistoricoMutation.isPending}
-                    variant="outline"
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    Salvar Carta
-                  </Button>
-                  <Button
-                    onClick={() => executarAcaoCarta('imprimir')}
-                    disabled={!membroSelecionado || !config || saveHistoricoMutation.isPending}
-                    variant="outline"
-                  >
-                    <Printer className="w-4 h-4 mr-2" />
-                    Imprimir Carta
-                  </Button>
                 </div>
 
                 {historicoEditando && (
@@ -756,9 +760,35 @@ export default function Cartas() {
           </div>
         ) : (
           <div>
-            <Button onClick={() => setShowPreview(false)} variant="outline" className="mb-6 print:hidden">
-              Voltar
-            </Button>
+            <div className="mb-6 print:hidden flex flex-wrap gap-3">
+              <Button onClick={() => setShowPreview(false)} variant="outline">
+                Voltar
+              </Button>
+              <Button
+                onClick={() => executarAcaoCarta('salvar')}
+                disabled={saveHistoricoMutation.isPending}
+                variant="outline"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Carta
+              </Button>
+              <Button
+                onClick={() => executarAcaoCarta('imprimir')}
+                disabled={saveHistoricoMutation.isPending}
+                variant="outline"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir Carta
+              </Button>
+              <Button
+                onClick={() => executarAcaoCarta('baixar')}
+                disabled={saveHistoricoMutation.isPending}
+                className="bg-gradient-to-r from-blue-500 to-purple-600"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Carta
+              </Button>
+            </div>
             <div className="print-area" ref={cartaRef}>
               <CartaTemplate />
             </div>
