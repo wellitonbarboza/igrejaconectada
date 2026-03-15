@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
+import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Mail, Search, FileText, Download, UserCheck, Pencil, Trash2, History } from 'lucide-react';
+import { Mail, Search, FileText, Download, UserCheck, Pencil, Trash2, History, Save, Printer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
-import { uploadElementSnapshot } from '@/utils/documentCapture';
 import ieadLogo from '@/assets/iead-logo.svg';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 
@@ -35,6 +34,8 @@ export default function Cartas() {
   const [modoFormularioImpresso, setModoFormularioImpresso] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const cartaRef = useRef(null);
+  const lastSavedSignatureRef = useRef(null);
+  const lastSavedHistoricoIdRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -100,6 +101,8 @@ export default function Cartas() {
     setEstadoDestino('');
     setFuncaoMinisterial('');
     setIncluirFamilia(false);
+    lastSavedSignatureRef.current = null;
+    lastSavedHistoricoIdRef.current = null;
   };
 
   const carregarCartaParaEdicao = (cartaHistorico) => {
@@ -116,6 +119,18 @@ export default function Cartas() {
     setFuncaoMinisterial(cartaHistorico.funcao_ministerial || '');
     setIncluirFamilia(Boolean(cartaHistorico.incluir_familia));
     setHistoricoEditando(cartaHistorico.id);
+    lastSavedSignatureRef.current = JSON.stringify({
+      tipoCarta: cartaHistorico.tipo_carta || 'recomendacao',
+      membroId: membro.id,
+      incluirFamilia: Boolean(cartaHistorico.incluir_familia),
+      cidadeDestino: cartaHistorico.cidade_destino || '',
+      estadoDestino: cartaHistorico.estado_destino || '',
+      funcaoMinisterial: cartaHistorico.funcao_ministerial || '',
+      modoFormularioImpresso,
+      igrejaNome: config?.nome_igreja || '',
+      pastorPresidente: config?.pastor_presidente || '',
+    });
+    lastSavedHistoricoIdRef.current = cartaHistorico.id;
     setShowPreview(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -146,49 +161,257 @@ export default function Cartas() {
     }
   };
 
-  const handleImprimir = async () => {
-    try {
-      if (cartaRef.current && membroSelecionado) {
-        const snapshot = await uploadElementSnapshot({
-          element: cartaRef.current,
-          fileNamePrefix: `carta-${membroSelecionado.id}`,
-          bucket: STORAGE_BUCKETS.documentos,
-        });
+  const getHistoricoSaveErrorMessage = (error) => {
+    const mensagemErro = String(error?.message || '').toLowerCase();
 
-        const emitidoPor = user?.full_name || user?.email || 'Sistema';
-
-        const historicoPayload = {
-          tipo_carta: tipoCarta,
-          membro_id: membroSelecionado.id,
-          membro_nome: membroSelecionado.nome_completo,
-          incluir_familia: incluirFamilia,
-          cidade_destino: cidadeDestino,
-          estado_destino: estadoDestino,
-          funcao_ministerial: funcaoMinisterial,
-          congregacao_id: membroSelecionado.congregacao_id || null,
-          congregacao_nome: membroSelecionado.congregacao_nome || null,
-          igreja_nome: config?.nome_igreja || null,
-          pastor_presidente: config?.pastor_presidente || null,
-          emitida_em: new Date().toISOString(),
-          emitido_por: emitidoPor,
-          arquivo_bucket: STORAGE_BUCKETS.documentos,
-          arquivo_path: snapshot?.path || null,
-          arquivo_url: snapshot?.file_url || null,
-        };
-
-        await saveHistoricoMutation.mutateAsync({
-          historicoId: historicoEditando,
-          payload: historicoPayload,
-        });
-
-        setHistoricoEditando(null);
-      }
-    } catch (error) {
-      console.error('Erro ao salvar a carta no histórico:', error);
-      window.alert('Não foi possível salvar a carta no histórico. Verifique se a tabela cartas_emitidas já foi criada no Supabase.');
+    if (mensagemErro.includes('cartas_emitidas') && mensagemErro.includes('does not exist')) {
+      return 'Não foi possível salvar no histórico porque a tabela "cartas_emitidas" não existe neste banco. Aplique as migrations de cartas no Supabase.';
     }
 
+    if (mensagemErro.includes('emitido_por') && mensagemErro.includes('does not exist')) {
+      return 'A coluna "emitido_por" não existe na tabela "cartas_emitidas". Aplique a migration 20250615113000_add_emitido_por_cartas_emitidas.sql.';
+    }
+
+    if (mensagemErro.includes('permission denied') || mensagemErro.includes('row-level security') || mensagemErro.includes('42501')) {
+      return 'Sem permissão para gravar em "cartas_emitidas". Verifique as policies RLS/grants do Supabase para usuários autenticados.';
+    }
+
+    return 'Não foi possível salvar a carta no histórico. Verifique permissões do banco e migrations pendentes.';
+  };
+
+  const getCartaSignature = () => {
+    if (!membroSelecionado) return null;
+
+    return JSON.stringify({
+      tipoCarta,
+      membroId: membroSelecionado.id,
+      incluirFamilia,
+      cidadeDestino: cidadeDestino.trim(),
+      estadoDestino: estadoDestino.trim(),
+      funcaoMinisterial: funcaoMinisterial.trim(),
+      modoFormularioImpresso,
+      igrejaNome: config?.nome_igreja || '',
+      pastorPresidente: config?.pastor_presidente || '',
+    });
+  };
+
+  const salvarCartaNoHistorico = async () => {
+    if (!membroSelecionado) return { saved: false, skipped: true };
+
+    const assinaturaAtual = getCartaSignature();
+    const assinaturaJaSalva = assinaturaAtual && assinaturaAtual === lastSavedSignatureRef.current;
+    const mesmoRegistro =
+      (!historicoEditando && !lastSavedHistoricoIdRef.current) ||
+      (historicoEditando && historicoEditando === lastSavedHistoricoIdRef.current);
+
+    if (assinaturaJaSalva && mesmoRegistro) {
+      return { saved: true, skipped: true };
+    }
+
+    try {
+      const emitidoPor = user?.full_name || user?.email || 'Sistema';
+
+      const historicoPayload = {
+        tipo_carta: tipoCarta,
+        membro_id: membroSelecionado.id,
+        membro_nome: membroSelecionado.nome_completo,
+        incluir_familia: incluirFamilia,
+        cidade_destino: cidadeDestino,
+        estado_destino: estadoDestino,
+        funcao_ministerial: funcaoMinisterial,
+        congregacao_id: membroSelecionado.congregacao_id || null,
+        congregacao_nome: membroSelecionado.congregacao_nome || null,
+        igreja_nome: config?.nome_igreja || null,
+        pastor_presidente: config?.pastor_presidente || null,
+        emitida_em: new Date().toISOString(),
+        emitido_por: emitidoPor,
+        arquivo_bucket: null,
+        arquivo_path: null,
+        arquivo_url: null,
+      };
+
+      const result = await saveHistoricoMutation.mutateAsync({
+        historicoId: historicoEditando,
+        payload: historicoPayload,
+      });
+
+      const registroSalvo = Array.isArray(result) ? result[0] : result;
+      lastSavedSignatureRef.current = assinaturaAtual;
+      lastSavedHistoricoIdRef.current = registroSalvo?.id || historicoEditando || null;
+      setHistoricoEditando(registroSalvo?.id || null);
+      return { saved: true, skipped: false };
+    } catch (error) {
+      console.error('Erro ao salvar a carta no histórico:', error);
+      window.alert(getHistoricoSaveErrorMessage(error));
+      return { saved: false, skipped: false };
+    }
+  };
+
+  const imprimirCarta = () => {
     window.print();
+  };
+
+  const renderCartaToCanvas = async (element) => {
+    const styles = Array.from(document.querySelectorAll('style'))
+      .map((style) => style.innerHTML)
+      .join('\n');
+
+    const rect = element.getBoundingClientRect();
+    const scale = 2;
+    const width = Math.max(1, Math.ceil(rect.width * scale));
+    const height = Math.max(1, Math.ceil(rect.height * scale));
+
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll('img').forEach((img) => img.remove());
+
+    const svgMarkup = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <foreignObject width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="width:${rect.width}px;height:${rect.height}px;background:#fff;transform:scale(${scale});transform-origin:top left;">
+            <style>${styles}</style>
+            ${clone.outerHTML}
+          </div>
+        </foreignObject>
+      </svg>
+    `;
+
+    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = svgUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+      return canvas;
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
+  };
+
+  const buildPdfFromJpegDataUrl = (jpegDataUrl, imageWidth, imageHeight) => {
+    const base64 = jpegDataUrl.split(',')[1];
+    const binary = atob(base64);
+    const imageBytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      imageBytes[i] = binary.charCodeAt(i);
+    }
+
+    const encoder = new TextEncoder();
+    const objects = [];
+    const offsets = [0];
+    let length = 0;
+
+    const push = (chunk) => {
+      objects.push(chunk);
+      length += chunk.length;
+    };
+
+    const pushText = (text) => push(encoder.encode(text));
+
+    pushText('%PDF-1.4\n');
+
+    offsets[1] = length;
+    pushText('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+    offsets[2] = length;
+    pushText('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+    offsets[3] = length;
+    pushText('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n');
+
+    offsets[4] = length;
+    pushText(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`);
+    push(imageBytes);
+    pushText('\nendstream\nendobj\n');
+
+    const content = encoder.encode('q\n595.28 0 0 841.89 0 0 cm\n/Im0 Do\nQ\n');
+    offsets[5] = length;
+    pushText(`5 0 obj\n<< /Length ${content.length} >>\nstream\n`);
+    push(content);
+    pushText('endstream\nendobj\n');
+
+    const xrefOffset = length;
+    pushText('xref\n0 6\n0000000000 65535 f \n');
+    for (let i = 1; i <= 5; i += 1) {
+      pushText(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
+    }
+    pushText(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+    return new Blob(objects, { type: 'application/pdf' });
+  };
+
+  const baixarCartaPdf = async () => {
+    if (!cartaRef.current || !membroSelecionado) {
+      window.alert('Gere a pré-visualização da carta antes de baixar o PDF.');
+      return;
+    }
+
+    const nomeBase = `carta-${(membroSelecionado.nome_completo || 'membro').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}`;
+
+    try {
+      const canvas = await renderCartaToCanvas(cartaRef.current);
+      const jpegData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdfBlob = buildPdfFromJpegDataUrl(jpegData, canvas.width, canvas.height);
+      const url = URL.createObjectURL(pdfBlob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${nomeBase}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (error) {
+      console.error('Erro ao gerar PDF da carta:', error);
+      try {
+        const canvas = await renderCartaToCanvas(cartaRef.current);
+        const pngUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = pngUrl;
+        link.download = `${nomeBase}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.alert('O PDF não pôde ser gerado neste navegador. Baixamos a carta em PNG para você salvar no computador.');
+      } catch {
+        window.alert('Não foi possível baixar a carta. Tente novamente.');
+      }
+    }
+  };
+
+  const executarAcaoCarta = async (acao) => {
+    if (!membroSelecionado || !config) {
+      window.alert('Selecione o membro e confirme as configurações antes de continuar.');
+      return;
+    }
+
+    if (!showPreview) {
+      setShowPreview(true);
+      await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+    }
+
+    const saveResult = await salvarCartaNoHistorico();
+    if (!saveResult.saved) return;
+
+    if (acao === 'imprimir') {
+      imprimirCarta();
+      return;
+    }
+
+    if (acao === 'baixar') {
+      await baixarCartaPdf();
+    }
   };
 
   const CartaTemplate = () => {
@@ -205,13 +428,15 @@ export default function Cartas() {
       transferencia: 'CARTA DE TRANSFERÊNCIA',
     };
 
+    const cidadeIgreja = config.cidade && config.estado ? `${config.cidade}/${config.estado}` : '____________________';
+
     return (
-      <div className="bg-white p-6 md:p-8 max-w-4xl mx-auto shadow-2xl print:shadow-none print:p-4 print:max-w-none print:h-[265mm] print:overflow-hidden">
-        <div className="text-center mb-8 pb-5 border-b border-slate-300">
+      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border flex flex-col">
+        <div className="text-center mb-7 pb-4 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
             alt="Logo"
-            className="h-20 mx-auto mb-3"
+            className="h-16 mx-auto mb-3"
           />
           <h1 className="text-2xl font-bold text-slate-900 mb-1">{config.nome_igreja}</h1>
           <div className="text-sm text-slate-600 space-y-1">
@@ -228,9 +453,9 @@ export default function Cartas() {
           </div>
         </div>
 
-        <div className="flex flex-col h-full">
-          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-6.5' : 'space-y-4 leading-7'}`}>
-            <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide">{tipoCartaTitulo[tipoCarta]}</h2>
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-7' : 'space-y-5 leading-8'} text-[15px]`}>
+            <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide mb-2">{tipoCartaTitulo[tipoCarta]}</h2>
 
             {modoFormularioImpresso ? (
               <>
@@ -241,7 +466,7 @@ export default function Cartas() {
                 <div>
                   <p>o(a) irmão(ã):</p>
                   <p className="border-b border-slate-400 mt-2 pb-1">{nomeCompleto}</p>
-                  <p className="mt-3">que congrega em Santa Tereza do Oeste - PR.</p>
+                  <p className="mt-3">que congrega nesta localidade.</p>
                 </div>
                 <div>
                   <p>O(A) irmão(ã) serve ao Senhor como:</p>
@@ -255,7 +480,7 @@ export default function Cartas() {
                   <strong>{estadoDestino || '__'}</strong>.
                 </p>
                 <p className="text-justify">
-                  o(a) irmão(ã): <strong>{nomeCompleto}</strong>, que congrega em Santa Tereza do Oeste - PR.
+                  o(a) irmão(ã): <strong>{nomeCompleto}</strong>, que congrega nesta localidade.
                 </p>
                 <p className="text-justify">
                   O(A) irmão(ã) serve ao Senhor como: <strong>{funcaoMinisterial || '________________________________________'}</strong>.
@@ -265,14 +490,14 @@ export default function Cartas() {
 
             <p className="text-justify">Portanto, pedimos que o(a) recebais no Senhor como usam fazer os santos.</p>
 
-            <p>
-              Santa Tereza do Oeste/PR, <strong>{dataAtual}</strong>.
+            <p className="pt-2">
+              {cidadeIgreja}, <strong>{dataAtual}</strong>.
             </p>
 
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-8 space-y-5">
+          <div className="mt-auto pt-[14mm] space-y-4">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -286,7 +511,7 @@ export default function Cartas() {
             </div>
 
             <div className="text-center">
-              <p className="text-lg font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
+              <p className="text-base font-semibold text-slate-800">&quot;Até aqui nos ajudou o Senhor&quot;</p>
               <p className="text-xs text-slate-500 mt-1">I Samuel 7:12b.</p>
             </div>
           </div>
@@ -300,37 +525,32 @@ export default function Cartas() {
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 6mm;
+          margin: 0;
         }
 
         @media print {
           html, body {
-            width: 210mm;
-            height: 297mm;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
 
-          body * {
-            visibility: hidden;
-          }
-
-          .print-area, .print-area * {
-            visibility: visible;
-          }
-
           .print-area {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            margin: 0 !important;
+            position: relative;
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto !important;
             padding: 0 !important;
+            overflow: hidden;
             page-break-inside: avoid;
             break-inside: avoid;
+          }
+
+          .print-area > div {
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
           }
         }
       `}</style>
@@ -344,12 +564,6 @@ export default function Cartas() {
             </h1>
             <p className="text-slate-500 mt-1">Emita cartas de recomendação, mudança e transferência para membros</p>
           </div>
-          {showPreview && (
-            <Button onClick={handleImprimir} className="bg-gradient-to-r from-blue-500 to-purple-600">
-              <Download className="w-4 h-4 mr-2" />
-              Baixar Carta
-            </Button>
-          )}
         </div>
 
         {!showPreview ? (
@@ -489,12 +703,13 @@ export default function Cartas() {
                     <UserCheck className="w-4 h-4 mr-2" />
                     {historicoEditando ? 'Atualizar Carta' : 'Gerar Carta'}
                   </Button>
-                  {historicoEditando && (
-                    <Button variant="outline" onClick={limparFormulario}>
-                      Cancelar edição
-                    </Button>
-                  )}
                 </div>
+
+                {historicoEditando && (
+                  <Button variant="outline" onClick={limparFormulario}>
+                    Cancelar edição
+                  </Button>
+                )}
 
                 {!config && <p className="text-sm text-red-600 text-center">Configure as informações da igreja antes de gerar cartas</p>}
               </CardContent>
@@ -558,9 +773,35 @@ export default function Cartas() {
           </div>
         ) : (
           <div>
-            <Button onClick={() => setShowPreview(false)} variant="outline" className="mb-6 print:hidden">
-              Voltar
-            </Button>
+            <div className="mb-6 print:hidden flex flex-wrap gap-3">
+              <Button onClick={() => setShowPreview(false)} variant="outline">
+                Voltar
+              </Button>
+              <Button
+                onClick={() => executarAcaoCarta('salvar')}
+                disabled={saveHistoricoMutation.isPending}
+                variant="outline"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Carta
+              </Button>
+              <Button
+                onClick={() => executarAcaoCarta('imprimir')}
+                disabled={saveHistoricoMutation.isPending}
+                variant="outline"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir Carta
+              </Button>
+              <Button
+                onClick={() => executarAcaoCarta('baixar')}
+                disabled={saveHistoricoMutation.isPending}
+                className="bg-gradient-to-r from-blue-500 to-purple-600"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Carta
+              </Button>
+            </div>
             <div className="print-area" ref={cartaRef}>
               <CartaTemplate />
             </div>
