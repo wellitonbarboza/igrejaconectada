@@ -1,7 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Mail, Search, FileText, Download, UserCheck, Pencil, Trash2, History } from 'lucide-react';
+import { Mail, Search, FileText, Download, UserCheck, Pencil, Trash2, History, Save, Printer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,6 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
-import { uploadElementSnapshot } from '@/utils/documentCapture';
 import ieadLogo from '@/assets/iead-logo.svg';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 
@@ -34,6 +33,7 @@ export default function Cartas() {
   const [historicoEditando, setHistoricoEditando] = useState(null);
   const [modoFormularioImpresso, setModoFormularioImpresso] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [acaoPendente, setAcaoPendente] = useState(null);
   const cartaRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
@@ -164,23 +164,8 @@ export default function Cartas() {
     return 'Não foi possível salvar a carta no histórico. Verifique permissões do banco e migrations pendentes.';
   };
 
-  const handleImprimir = async () => {
-    if (!cartaRef.current || !membroSelecionado) {
-      window.print();
-      return;
-    }
-
-    let snapshot = null;
-    try {
-      snapshot = await uploadElementSnapshot({
-        element: cartaRef.current,
-        fileNamePrefix: `carta-${membroSelecionado.id}`,
-        bucket: STORAGE_BUCKETS.documentos,
-      });
-    } catch (snapshotError) {
-      console.error('Falha ao enviar snapshot da carta para o Storage:', snapshotError);
-      window.alert('A carta será impressa normalmente, mas o arquivo não pôde ser enviado ao Storage. O histórico será salvo sem anexo.');
-    }
+  const salvarCartaNoHistorico = async () => {
+    if (!membroSelecionado) return false;
 
     try {
       const emitidoPor = user?.full_name || user?.email || 'Sistema';
@@ -199,9 +184,9 @@ export default function Cartas() {
         pastor_presidente: config?.pastor_presidente || null,
         emitida_em: new Date().toISOString(),
         emitido_por: emitidoPor,
-        arquivo_bucket: snapshot ? STORAGE_BUCKETS.documentos : null,
-        arquivo_path: snapshot?.path || null,
-        arquivo_url: snapshot?.file_url || null,
+        arquivo_bucket: null,
+        arquivo_path: null,
+        arquivo_url: null,
       };
 
       await saveHistoricoMutation.mutateAsync({
@@ -210,13 +195,182 @@ export default function Cartas() {
       });
 
       setHistoricoEditando(null);
+      return true;
     } catch (error) {
       console.error('Erro ao salvar a carta no histórico:', error);
       window.alert(getHistoricoSaveErrorMessage(error));
+      return false;
     }
+  };
 
+  const imprimirCarta = () => {
     window.print();
   };
+
+  const renderCartaToCanvas = async (element) => {
+    const styles = Array.from(document.querySelectorAll('style'))
+      .map((style) => style.innerHTML)
+      .join('\n');
+
+    const rect = element.getBoundingClientRect();
+    const scale = 2;
+    const width = Math.max(1, Math.ceil(rect.width * scale));
+    const height = Math.max(1, Math.ceil(rect.height * scale));
+
+    const svgMarkup = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <foreignObject width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="width:${rect.width}px;height:${rect.height}px;background:#fff;transform:scale(${scale});transform-origin:top left;">
+            <style>${styles}</style>
+            ${element.outerHTML}
+          </div>
+        </foreignObject>
+      </svg>
+    `;
+
+    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = svgUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+      return canvas;
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
+  };
+
+  const buildPdfFromJpegDataUrl = (jpegDataUrl, imageWidth, imageHeight) => {
+    const base64 = jpegDataUrl.split(',')[1];
+    const binary = atob(base64);
+    const imageBytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      imageBytes[i] = binary.charCodeAt(i);
+    }
+
+    const encoder = new TextEncoder();
+    const objects = [];
+    const offsets = [0];
+    let length = 0;
+
+    const push = (chunk) => {
+      objects.push(chunk);
+      length += chunk.length;
+    };
+
+    const pushText = (text) => push(encoder.encode(text));
+
+    pushText('%PDF-1.4\n');
+
+    offsets[1] = length;
+    pushText('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+
+    offsets[2] = length;
+    pushText('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+    offsets[3] = length;
+    pushText('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n');
+
+    offsets[4] = length;
+    pushText(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`);
+    push(imageBytes);
+    pushText('\nendstream\nendobj\n');
+
+    const content = encoder.encode('q\n595.28 0 0 841.89 0 0 cm\n/Im0 Do\nQ\n');
+    offsets[5] = length;
+    pushText(`5 0 obj\n<< /Length ${content.length} >>\nstream\n`);
+    push(content);
+    pushText('endstream\nendobj\n');
+
+    const xrefOffset = length;
+    pushText('xref\n0 6\n0000000000 65535 f \n');
+    for (let i = 1; i <= 5; i += 1) {
+      pushText(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
+    }
+    pushText(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+    return new Blob(objects, { type: 'application/pdf' });
+  };
+
+  const baixarCartaPdf = async () => {
+    if (!cartaRef.current || !membroSelecionado) {
+      window.alert('Gere a pré-visualização da carta antes de baixar o PDF.');
+      return;
+    }
+
+    try {
+      const canvas = await renderCartaToCanvas(cartaRef.current);
+      const jpegData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdfBlob = buildPdfFromJpegDataUrl(jpegData, canvas.width, canvas.height);
+      const url = URL.createObjectURL(pdfBlob);
+      const nomeArquivo = `carta-${(membroSelecionado.nome_completo || 'membro').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}.pdf`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomeArquivo;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao gerar PDF da carta:', error);
+      window.alert('Não foi possível baixar o PDF da carta. Tente novamente.');
+    }
+  };
+
+  const executarAcaoCarta = (acao) => {
+    setShowPreview(true);
+    setAcaoPendente(acao);
+  };
+
+  useEffect(() => {
+    if (!showPreview || !acaoPendente) return;
+
+    const timer = setTimeout(async () => {
+      if (acaoPendente === 'salvar') {
+        await salvarCartaNoHistorico();
+      }
+
+      if (acaoPendente === 'imprimir') {
+        await salvarCartaNoHistorico();
+        imprimirCarta();
+      }
+
+      if (acaoPendente === 'baixar') {
+        await salvarCartaNoHistorico();
+        await baixarCartaPdf();
+      }
+
+      setAcaoPendente(null);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [
+    acaoPendente,
+    cidadeDestino,
+    config?.nome_igreja,
+    config?.pastor_presidente,
+    estadoDestino,
+    funcaoMinisterial,
+    historicoEditando,
+    incluirFamilia,
+    membroSelecionado,
+    saveHistoricoMutation,
+    showPreview,
+    tipoCarta,
+    user?.email,
+    user?.full_name,
+  ]);
 
   const CartaTemplate = () => {
     if (!membroSelecionado || !config) return null;
@@ -372,7 +526,7 @@ export default function Cartas() {
             <p className="text-slate-500 mt-1">Emita cartas de recomendação, mudança e transferência para membros</p>
           </div>
           {showPreview && (
-            <Button onClick={handleImprimir} className="bg-gradient-to-r from-blue-500 to-purple-600">
+            <Button onClick={() => executarAcaoCarta('baixar')} className="bg-gradient-to-r from-blue-500 to-purple-600">
               <Download className="w-4 h-4 mr-2" />
               Baixar Carta
             </Button>
@@ -507,21 +661,38 @@ export default function Cartas() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Button
                     onClick={() => setShowPreview(true)}
                     disabled={!membroSelecionado || !config}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600"
+                    className="bg-gradient-to-r from-blue-500 to-purple-600"
                   >
                     <UserCheck className="w-4 h-4 mr-2" />
                     {historicoEditando ? 'Atualizar Carta' : 'Gerar Carta'}
                   </Button>
-                  {historicoEditando && (
-                    <Button variant="outline" onClick={limparFormulario}>
-                      Cancelar edição
-                    </Button>
-                  )}
+                  <Button
+                    onClick={() => executarAcaoCarta('salvar')}
+                    disabled={!membroSelecionado || !config || saveHistoricoMutation.isPending}
+                    variant="outline"
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Salvar Carta
+                  </Button>
+                  <Button
+                    onClick={() => executarAcaoCarta('imprimir')}
+                    disabled={!membroSelecionado || !config || saveHistoricoMutation.isPending}
+                    variant="outline"
+                  >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Imprimir Carta
+                  </Button>
                 </div>
+
+                {historicoEditando && (
+                  <Button variant="outline" onClick={limparFormulario}>
+                    Cancelar edição
+                  </Button>
+                )}
 
                 {!config && <p className="text-sm text-red-600 text-center">Configure as informações da igreja antes de gerar cartas</p>}
               </CardContent>
