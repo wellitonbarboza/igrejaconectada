@@ -633,6 +633,36 @@ export const base44 = {
         const file_url = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodedPath}`;
         return { file_url, path: fileName };
       },
+      async DeleteFile({ bucket = STORAGE_BUCKET, path }) {
+        assertSupabaseEnv();
+        if (!path) return null;
+
+        if (bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares) {
+          await assertAdminForPhotoUpload();
+        }
+
+        const authToken = getRequiredAuthToken();
+        const apiKey = SUPABASE_ANON_KEY;
+        const encodedPath = path
+          .split('/')
+          .map((segment) => encodeURIComponent(segment))
+          .join('/');
+
+        const response = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${encodedPath}`, {
+          method: 'DELETE',
+          headers: {
+            apikey: apiKey,
+            Authorization: `Bearer ${authToken}`,
+          },
+        });
+
+        if (!response.ok && response.status !== 404) {
+          const text = await response.text();
+          throw new Error(text || 'Erro ao remover arquivo');
+        }
+
+        return true;
+      },
     },
   },
 };

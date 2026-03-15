@@ -8,6 +8,7 @@ const ROLE_PERMISSIONS = {
   usuario: [
     'Dashboard',
     'Membros',
+    'ArquivoMorto',
     'DetalhesMembro',
     'Departamentos',
     'DetalhesDepartamento',

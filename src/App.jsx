@@ -15,6 +15,7 @@ import Configuracoes from '@/pages/Configuracoes.jsx';
 import Cartas from '@/pages/Cartas.jsx';
 import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
 import Download from '@/pages/Download.jsx';
+import ArquivoMorto from '@/pages/ArquivoMorto.jsx';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { hasPageAccess } from '@/utils/accessControl';
@@ -78,6 +79,7 @@ export default function App() {
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
         <Route path={createPageUrl('Membros')} element={<Membros />} />
         <Route path={createPageUrl('DetalhesMembro')} element={<DetalhesMembro />} />
+        <Route path={createPageUrl('ArquivoMorto')} element={<ArquivoMorto />} />
         <Route path={createPageUrl('DetalhesCongregacao')} element={<ProtectedRoute page="Congregacoes"><DetalhesCongregacao /></ProtectedRoute>} />
         <Route path={createPageUrl('DetalhesDepartamento')} element={<DetalhesDepartamento />} />
         <Route path={createPageUrl('Departamentos')} element={<Departamentos />} />

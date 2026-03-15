@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Search, Download, Calendar, Hash } from 'lucide-react';
@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
-import churchLogo from '@/assets/church-logo.svg';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
-import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
+import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 import ieadLogo from '@/assets/iead-logo.svg';
 
 
@@ -29,9 +28,11 @@ export default function Cartoes() {
     initialData: [],
   });
 
-  const filteredMembros = (isAdmin ? membros : membros.filter((m) => m.congregacao_id === user?.congregacao_id)).filter(
-    (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMembros = useMemo(() => (
+    (isAdmin ? membros : membros.filter((m) => m.congregacao_id === user?.congregacao_id)).filter(
+      (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  ), [membros, isAdmin, user?.congregacao_id, searchTerm]);
 
   const toggleMembro = (membroId) => {
     setMembrosSelecionados((prev) =>
@@ -59,8 +60,6 @@ export default function Cartoes() {
     window.print();
   };
 
-  const resolveFotoUrl = (membro) => resolveMemberPhotoUrl(membro);
-
   const CartaoMembro = ({ membro }) => (
     <div className="w-[350px] h-[220px] bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden print:break-inside-avoid print:mb-4">
       <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -mr-20 -mt-20" />
@@ -76,17 +75,7 @@ export default function Cartoes() {
         </div>
 
         <div className="flex-1 flex items-center gap-4">
-          {resolveFotoUrl(membro) ? (
-            <img
-              src={resolveFotoUrl(membro)}
-              alt={`Foto de ${membro.nome_completo}`}
-              className="w-16 h-16 rounded-full object-cover border-2 border-white"
-            />
-          ) : (
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-              <span className="text-blue-600 font-bold text-2xl">{membro.nome_completo?.charAt(0)}</span>
-            </div>
-          )}
+          <MemberAvatar membro={membro} sizeClass="w-16 h-16" textClass="text-2xl" className="border-2 border-white" />
           <div className="flex-1">
             <p className="font-bold text-xl mb-1">{membro.nome_completo}</p>
             <Badge className="bg-white text-blue-600 text-xs">{membro.tipo}</Badge>
@@ -94,6 +83,7 @@ export default function Cartoes() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 text-xs mt-auto">
+          <div className="col-span-2 opacity-90 truncate">Congregação: {membro.congregacao_nome || '-'}</div>
           <div className="flex items-center gap-2">
             <Hash className="w-3 h-3" />
             <span className="opacity-80">ID: {String(membro.id).slice(-6)}</span>
@@ -122,6 +112,7 @@ export default function Cartoes() {
             </h1>
             <p className="text-slate-500 mt-1">Selecione os membros para gerar cartões de identificação</p>
           </div>
+          <div className="flex flex-wrap gap-2">
           <Button
             onClick={handleImprimir}
             disabled={membrosSelecionados.length === 0}
@@ -130,6 +121,14 @@ export default function Cartoes() {
             <Download className="w-4 h-4 mr-2" />
             Baixar Cartões ({membrosSelecionados.length})
           </Button>
+          <Button
+            variant="outline"
+            disabled={membrosSelecionados.length !== 1}
+            onClick={handleImprimir}
+          >
+            Gerar cartão individual
+          </Button>
+          </div>
         </div>
 
         <Card className="shadow-lg border-0 print:hidden">
@@ -160,17 +159,7 @@ export default function Cartoes() {
                       onChange={() => toggleMembro(membro.id)}
                       className="w-5 h-5 rounded border-slate-300"
                     />
-                    {resolveFotoUrl(membro) ? (
-                      <img
-                        src={resolveFotoUrl(membro)}
-                        alt={`Foto de ${membro.nome_completo}`}
-                        className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold text-sm">{membro.nome_completo?.charAt(0)}</span>
-                      </div>
-                    )}
+                    <MemberAvatar membro={membro} />
                     <div className="flex-1">
                       <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
                       <p className="text-sm text-slate-500">{membro.congregacao_nome}</p>

@@ -1,6 +1,5 @@
 import React from 'react';
 import { base44 } from '@/api/base44Client';
-import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -21,6 +20,7 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -33,10 +33,7 @@ export default function DetalhesMembro() {
 
   const { data: membro, isLoading } = useQuery({
     queryKey: ['membro', membroId],
-    queryFn: async () => {
-      const membros = await base44.entities.Membro.list();
-      return membros.find((m) => m.id === membroId);
-    },
+    queryFn: () => base44.entities.Membro.retrieve(membroId),
     enabled: Boolean(membroId),
   });
 
@@ -56,7 +53,6 @@ export default function DetalhesMembro() {
     );
   }
 
-  const fotoUrl = resolveMemberPhotoUrl(membro);
 
   const getTipoBadgeColor = (tipo) => {
     const colors = {
@@ -112,17 +108,7 @@ export default function DetalhesMembro() {
         <Card className="shadow-lg border-0">
           <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
             <div className="flex items-center gap-6">
-              {fotoUrl ? (
-                <img
-                  src={fotoUrl}
-                  alt={`Foto de ${membro.nome_completo}`}
-                  className="w-24 h-24 rounded-full object-cover shadow-lg border-2 border-white"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-4xl">{membro.nome_completo?.charAt(0)}</span>
-                </div>
-              )}
+              <MemberAvatar membro={membro} sizeClass="w-24 h-24" textClass="text-4xl" className="shadow-lg border-2 border-white" />
               <div className="flex-1">
                 <CardTitle className="text-2xl">{membro.nome_completo}</CardTitle>
                 <div className="flex gap-2 mt-2 flex-wrap">

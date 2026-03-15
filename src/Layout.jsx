@@ -14,6 +14,7 @@ import {
   Mail,
   Settings,
   LogOut,
+  Archive,
 } from 'lucide-react';
 import ieadLogo from '@/assets/iead-logo.svg';
 import {
@@ -47,6 +48,12 @@ export default function Layout({ children }) {
       url: createPageUrl('Membros'),
       icon: Users,
       page: 'Membros',
+    },
+    {
+      title: 'Arquivo Morto',
+      url: createPageUrl('ArquivoMorto'),
+      icon: Archive,
+      page: 'ArquivoMorto',
     },
     {
       title: 'Departamentos',

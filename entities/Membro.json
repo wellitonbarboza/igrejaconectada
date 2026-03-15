@@ -8,19 +8,31 @@
     },
     "tipo": {
       "type": "string",
-      "enum": ["membro", "congregado", "visitante", "crianca"],
+      "enum": [
+        "membro",
+        "congregado",
+        "visitante",
+        "crianca"
+      ],
       "default": "congregado",
       "description": "Tipo de vínculo com a igreja"
     },
     "origem": {
       "type": "string",
-      "enum": ["novo", "transferencia"],
+      "enum": [
+        "novo",
+        "transferencia"
+      ],
       "default": "novo",
       "description": "Se é novo convertido ou vem por transferência"
     },
     "status": {
       "type": "string",
-      "enum": ["ativo", "inativo", "transferido"],
+      "enum": [
+        "ativo",
+        "inativo",
+        "transferido"
+      ],
       "default": "ativo",
       "description": "Status atual do membro"
     },
@@ -47,12 +59,20 @@
     },
     "sexo": {
       "type": "string",
-      "enum": ["masculino", "feminino"],
+      "enum": [
+        "masculino",
+        "feminino"
+      ],
       "description": "Sexo"
     },
     "estado_civil": {
       "type": "string",
-      "enum": ["solteiro", "casado", "divorciado", "viuvo"],
+      "enum": [
+        "solteiro",
+        "casado",
+        "divorciado",
+        "viuvo"
+      ],
       "description": "Estado civil"
     },
     "telefone": {
@@ -113,7 +133,13 @@
     },
     "cargo_obreiro": {
       "type": "string",
-      "enum": ["cooperador", "diacono", "presbitero", "evangelista", "pastor"],
+      "enum": [
+        "cooperador",
+        "diacono",
+        "presbitero",
+        "evangelista",
+        "pastor"
+      ],
       "description": "Cargo do obreiro"
     },
     "departamento_id": {
@@ -136,7 +162,18 @@
       "type": "boolean",
       "default": true,
       "description": "Se o membro está ativo"
+    },
+    "foto_path": {
+      "type": "string",
+      "description": "Caminho da foto no storage"
+    },
+    "foto_bucket": {
+      "type": "string",
+      "description": "Bucket da foto do membro"
     }
   },
-  "required": ["nome_completo", "congregacao_id"]
+  "required": [
+    "nome_completo",
+    "congregacao_id"
+  ]
 }

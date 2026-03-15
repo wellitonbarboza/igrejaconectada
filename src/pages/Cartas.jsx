@@ -19,7 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
 import ieadLogo from '@/assets/iead-logo.svg';
-import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
+import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 
 export default function Cartas() {
   const { user } = useAuth();
@@ -452,17 +452,7 @@ export default function Cartas() {
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              {resolveMemberPhotoUrl(membro) ? (
-                                <img
-                                  src={resolveMemberPhotoUrl(membro)}
-                                  alt={`Foto de ${membro.nome_completo}`}
-                                  className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
-                                />
-                              ) : (
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                                  <span className="text-white font-semibold text-sm">{membro.nome_completo?.charAt(0)}</span>
-                                </div>
-                              )}
+                              <MemberAvatar membro={membro} />
                               <div>
                                 <p className="font-medium text-slate-900">{membro.nome_completo}</p>
                                 <p className="text-sm text-slate-500">{membro.congregacao_nome}</p>
@@ -478,17 +468,7 @@ export default function Cartas() {
                 {membroSelecionado && (
                   <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <Checkbox id="incluir_familia" checked={incluirFamilia} onCheckedChange={setIncluirFamilia} />
-                    <div className="w-12 h-12 rounded-full overflow-hidden border border-blue-200 bg-white flex items-center justify-center">
-                      {resolveMemberPhotoUrl(membroSelecionado) ? (
-                        <img
-                          src={resolveMemberPhotoUrl(membroSelecionado)}
-                          alt={`Foto de ${membroSelecionado.nome_completo}`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-blue-700 font-semibold">{membroSelecionado.nome_completo?.charAt(0)}</span>
-                      )}
-                    </div>
+                    <MemberAvatar membro={membroSelecionado} sizeClass="w-12 h-12" className="border border-blue-200" />
                     <div className="flex-1">
                       <Label htmlFor="incluir_familia" className="cursor-pointer font-semibold text-blue-900">
                         Incluir "e Família"
