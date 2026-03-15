@@ -262,12 +262,15 @@ export default function Cartas() {
     const width = Math.max(1, Math.ceil(rect.width * scale));
     const height = Math.max(1, Math.ceil(rect.height * scale));
 
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll('img').forEach((img) => img.remove());
+
     const svgMarkup = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
         <foreignObject width="100%" height="100%">
           <div xmlns="http://www.w3.org/1999/xhtml" style="width:${rect.width}px;height:${rect.height}px;background:#fff;transform:scale(${scale});transform-origin:top left;">
             <style>${styles}</style>
-            ${element.outerHTML}
+            ${clone.outerHTML}
           </div>
         </foreignObject>
       </svg>
@@ -429,7 +432,7 @@ export default function Cartas() {
     const cidadeIgreja = config.cidade && config.estado ? `${config.cidade}/${config.estado}` : '____________________';
 
     return (
-      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border overflow-hidden">
+      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border">
         <div className="text-center mb-7 pb-4 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
@@ -495,7 +498,7 @@ export default function Cartas() {
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-[24mm] space-y-7">
+          <div className="mt-auto pt-[16mm] space-y-5">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -556,6 +559,12 @@ export default function Cartas() {
             overflow: hidden;
             page-break-inside: avoid;
             break-inside: avoid;
+          }
+
+          .print-area > div {
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
           }
         }
       `}</style>
