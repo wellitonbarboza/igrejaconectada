@@ -432,7 +432,7 @@ export default function Cartas() {
     const cidadeIgreja = config.cidade && config.estado ? `${config.cidade}/${config.estado}` : '____________________';
 
     return (
-      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border">
+      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border flex flex-col">
         <div className="text-center mb-7 pb-4 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
@@ -454,7 +454,7 @@ export default function Cartas() {
           </div>
         </div>
 
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col flex-1 min-h-0">
           <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-7' : 'space-y-5 leading-8'} text-[15px]`}>
             <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide mb-2">{tipoCartaTitulo[tipoCarta]}</h2>
 
@@ -498,7 +498,7 @@ export default function Cartas() {
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-[16mm] space-y-5">
+          <div className="mt-auto pt-[14mm] space-y-4">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -531,30 +531,17 @@ export default function Cartas() {
 
         @media print {
           html, body {
-            width: 210mm;
-            height: 297mm;
             margin: 0 !important;
             padding: 0 !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
 
-          body * {
-            visibility: hidden !important;
-          }
-
-          .print-area,
-          .print-area * {
-            visibility: visible !important;
-          }
-
           .print-area {
-            position: fixed;
-            left: 0;
-            top: 0;
+            position: relative;
             width: 210mm;
             height: 297mm;
-            margin: 0 !important;
+            margin: 0 auto !important;
             padding: 0 !important;
             overflow: hidden;
             page-break-inside: avoid;
