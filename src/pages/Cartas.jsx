@@ -33,6 +33,7 @@ export default function Cartas() {
   const [historicoEditando, setHistoricoEditando] = useState(null);
   const [modoFormularioImpresso, setModoFormularioImpresso] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [acaoPendente, setAcaoPendente] = useState(null);
   const cartaRef = useRef(null);
   const lastSavedSignatureRef = useRef(null);
   const lastSavedHistoricoIdRef = useRef(null);
@@ -530,8 +531,6 @@ export default function Cartas() {
 
         @media print {
           html, body {
-            width: 210mm;
-            height: 297mm;
             margin: 0 !important;
             padding: 0 !important;
             overflow: hidden !important;
@@ -712,11 +711,11 @@ export default function Cartas() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Button
                     onClick={() => setShowPreview(true)}
                     disabled={!membroSelecionado || !config}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600"
+                    className="bg-gradient-to-r from-blue-500 to-purple-600"
                   >
                     <UserCheck className="w-4 h-4 mr-2" />
                     {historicoEditando ? 'Atualizar Carta' : 'Gerar Carta'}
