@@ -491,14 +491,14 @@ export default function Cartas() {
 
             <p className="text-justify">Portanto, pedimos que o(a) recebais no Senhor como usam fazer os santos.</p>
 
-            <p className="pt-2">
+            <p className="pt-5">
               {cidadeIgreja}, <strong>{dataAtual}</strong>.
             </p>
 
-            <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
+            <p className="pt-1 text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="mt-auto pt-[14mm] space-y-4">
+          <div className="mt-auto pt-[10mm] space-y-4">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -533,15 +533,27 @@ export default function Cartas() {
           html, body {
             margin: 0 !important;
             padding: 0 !important;
+            overflow: hidden !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
 
+          body * {
+            visibility: hidden !important;
+          }
+
+          .print-area,
+          .print-area * {
+            visibility: visible !important;
+          }
+
           .print-area {
-            position: relative;
+            position: fixed;
+            left: 0;
+            top: 0;
             width: 210mm;
             height: 297mm;
-            margin: 0 auto !important;
+            margin: 0 !important;
             padding: 0 !important;
             overflow: hidden;
             page-break-inside: avoid;
@@ -552,6 +564,10 @@ export default function Cartas() {
             width: 210mm !important;
             height: 297mm !important;
             margin: 0 !important;
+          }
+
+          .print\:hidden {
+            display: none !important;
           }
         }
       `}</style>
