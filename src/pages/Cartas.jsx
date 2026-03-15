@@ -355,23 +355,36 @@ export default function Cartas() {
       return;
     }
 
+    const nomeBase = `carta-${(membroSelecionado.nome_completo || 'membro').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}`;
+
     try {
       const canvas = await renderCartaToCanvas(cartaRef.current);
       const jpegData = canvas.toDataURL('image/jpeg', 0.95);
       const pdfBlob = buildPdfFromJpegDataUrl(jpegData, canvas.width, canvas.height);
       const url = URL.createObjectURL(pdfBlob);
-      const nomeArquivo = `carta-${(membroSelecionado.nome_completo || 'membro').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}.pdf`;
 
       const link = document.createElement('a');
       link.href = url;
-      link.download = nomeArquivo;
+      link.download = `${nomeBase}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1500);
     } catch (error) {
       console.error('Erro ao gerar PDF da carta:', error);
-      window.alert('Não foi possível baixar o PDF da carta. Tente novamente.');
+      try {
+        const canvas = await renderCartaToCanvas(cartaRef.current);
+        const pngUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = pngUrl;
+        link.download = `${nomeBase}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.alert('O PDF não pôde ser gerado neste navegador. Baixamos a carta em PNG para você salvar no computador.');
+      } catch {
+        window.alert('Não foi possível baixar a carta. Tente novamente.');
+      }
     }
   };
 
@@ -416,7 +429,7 @@ export default function Cartas() {
     const cidadeIgreja = config.cidade && config.estado ? `${config.cidade}/${config.estado}` : '____________________';
 
     return (
-      <div className="bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto px-[14mm] py-[12mm] shadow-2xl print:shadow-none print:p-[12mm] print:max-w-none print:min-h-[297mm]">
+      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border overflow-hidden">
         <div className="text-center mb-7 pb-4 border-b border-slate-300">
           <img
             src={config.logo_url || ieadLogo}
@@ -438,7 +451,7 @@ export default function Cartas() {
           </div>
         </div>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col h-full">
           <div className={`text-slate-800 ${modoFormularioImpresso ? 'space-y-5 leading-7' : 'space-y-5 leading-8'} text-[15px]`}>
             <h2 className="text-xl font-bold text-center text-slate-900 tracking-wide mb-2">{tipoCartaTitulo[tipoCarta]}</h2>
 
@@ -482,7 +495,7 @@ export default function Cartas() {
             <p className="text-xs text-slate-500">Esta carta tem a validade de 30 dias após a sua emissão.</p>
           </div>
 
-          <div className="pt-8 space-y-6">
+          <div className="mt-auto pt-[24mm] space-y-7">
             <div className="grid grid-cols-2 gap-6 text-center">
               <div>
                 <div className="border-t border-slate-500 w-72 max-w-full mx-auto mb-2"></div>
@@ -524,18 +537,23 @@ export default function Cartas() {
           }
 
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
 
-          .print-area, .print-area * {
-            visibility: visible;
+          .print-area,
+          .print-area * {
+            visibility: visible !important;
           }
 
           .print-area {
+            position: fixed;
+            left: 0;
+            top: 0;
             width: 210mm;
-            min-height: 297mm;
+            height: 297mm;
             margin: 0 !important;
             padding: 0 !important;
+            overflow: hidden;
             page-break-inside: avoid;
             break-inside: avoid;
           }
