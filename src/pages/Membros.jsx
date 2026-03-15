@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
   Users,
@@ -11,7 +11,7 @@ import {
   Eye,
   Edit,
   MoreVertical,
-  Trash2,
+  Archive,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,8 @@ import {
 import ModalMembro from '@/components/membros/ModalMembro.jsx';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
-import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
+import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function Membros() {
   const navigate = useNavigate();
@@ -89,14 +90,20 @@ export default function Membros() {
     editHandledRef.current = true;
   }, [membros]);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Membro.delete(id),
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, status }) =>
+      base44.entities.Membro.update(id, {
+        status,
+        ativo: status === 'ativo',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['membros'] });
     },
   });
 
-  const filteredMembros = membros.filter((membro) => {
+  const activeMembros = membros.filter((membro) => !isArchivedMember(membro));
+
+  const filteredMembros = activeMembros.filter((membro) => {
     const matchesSearch =
       membro.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       membro.telefone?.includes(searchTerm) ||
@@ -133,10 +140,13 @@ export default function Membros() {
     navigate(`${createPageUrl('DetalhesMembro')}?id=${membro.id}`);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir este membro?')) {
-      await deleteMutation.mutateAsync(id);
-    }
+  const handleArchive = async (membro) => {
+    const shouldArchive = window.confirm(
+      'Deseja mover este membro para o arquivo morto? O registro não será excluído.'
+    );
+    if (!shouldArchive) return;
+
+    await archiveMutation.mutateAsync({ id: membro.id, status: 'inativo' });
   };
 
   const handleCloseModal = () => {
@@ -177,19 +187,27 @@ export default function Membros() {
               Membros
             </h1>
             <p className="text-slate-500 mt-1">
-              Gerencie os membros da sua {isAdmin ? 'igreja' : 'congregação'}
+              Gerencie os membros ativos da sua {isAdmin ? 'igreja' : 'congregação'}
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setMembroSelecionado(null);
-              setShowModal(true);
-            }}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Novo Membro
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(createPageUrl('ArquivoMorto'))}
+            >
+              Arquivo Morto
+            </Button>
+            <Button
+              onClick={() => {
+                setMembroSelecionado(null);
+                setShowModal(true);
+              }}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Novo Membro
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-lg border-0">
@@ -304,19 +322,7 @@ export default function Membros() {
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {resolveMemberPhotoUrl(membro) ? (
-                              <img
-                                src={resolveMemberPhotoUrl(membro)}
-                                alt={`Foto de ${membro.nome_completo}`}
-                                className="w-10 h-10 rounded-full object-cover border border-white shadow-sm"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                                <span className="text-white font-semibold text-sm">
-                                  {membro.nome_completo?.charAt(0)}
-                                </span>
-                              </div>
-                            )}
+                            <MemberAvatar membro={membro} />
                             <div>
                               <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
                               {membro.email && (
@@ -373,12 +379,12 @@ export default function Membros() {
                               <DropdownMenuItem
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  handleDelete(membro.id);
+                                  handleArchive(membro);
                                 }}
                                 className="text-red-600"
                               >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Excluir
+                                <Archive className="w-4 h-4 mr-2" />
+                                Arquivar
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
