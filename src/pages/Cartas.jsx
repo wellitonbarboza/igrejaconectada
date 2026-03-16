@@ -522,7 +522,7 @@ export default function Cartas() {
   };
 
   return (
-    <div className="p-4 md:p-8 min-h-screen">
+    <div className="cartas-page p-4 md:p-8 min-h-screen">
       <style>{`
         @page {
           size: A4 portrait;
@@ -538,13 +538,24 @@ export default function Cartas() {
             print-color-adjust: exact;
           }
 
-          body * {
-            visibility: hidden !important;
+          .cartas-page {
+            padding: 0 !important;
+            min-height: auto !important;
           }
 
-          .print-area,
-          .print-area * {
-            visibility: visible !important;
+          .cartas-page .max-w-7xl {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .print\:hidden {
+            display: none !important;
+          }
+
+          .preview-shell {
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
           .print-area {
@@ -564,10 +575,6 @@ export default function Cartas() {
             width: 210mm !important;
             height: 297mm !important;
             margin: 0 !important;
-          }
-
-          .print\:hidden {
-            display: none !important;
           }
         }
       `}</style>
@@ -789,7 +796,7 @@ export default function Cartas() {
             </Card>
           </div>
         ) : (
-          <div>
+          <div className="preview-shell">
             <div className="mb-6 print:hidden flex flex-wrap gap-3">
               <Button onClick={() => setShowPreview(false)} variant="outline">
                 Voltar
