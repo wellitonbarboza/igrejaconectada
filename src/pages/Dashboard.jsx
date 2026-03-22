@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { Users, Building2, GitBranch, TrendingUp, UserPlus, Cake, Download, Smartphone, Monitor } from 'lucide-react';
+import { Users, Building2, GitBranch, TrendingUp, UserPlus, Cake, Download, Smartphone, Monitor, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -50,7 +51,7 @@ export default function Dashboard() {
     };
   }, []);
 
-  const { data: membros = [] } = useQuery({
+  const { data: membros = [], isLoading: loadingMembros } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('-created_date'),
     initialData: [],
@@ -79,6 +80,31 @@ export default function Dashboard() {
         (d) => !d.congregacao_id || d.congregacao_id === user?.congregacao_id
       );
 
+  const hoje = new Date();
+  const primeiroDiaMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const primeiroDiaMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+
+  const novosEsteMes = useMemo(
+    () =>
+      filteredMembros.filter((m) => {
+        if (!m.created_date) return false;
+        return new Date(m.created_date) >= primeiroDiaMesAtual;
+      }).length,
+    [filteredMembros, primeiroDiaMesAtual]
+  );
+
+  const novosMesAnterior = useMemo(
+    () =>
+      filteredMembros.filter((m) => {
+        if (!m.created_date) return false;
+        const d = new Date(m.created_date);
+        return d >= primeiroDiaMesAnterior && d < primeiroDiaMesAtual;
+      }).length,
+    [filteredMembros, primeiroDiaMesAtual, primeiroDiaMesAnterior]
+  );
+
+  const crescimentoDiff = novosEsteMes - novosMesAnterior;
+
   const membrosAtivos = filteredMembros.filter((m) => m.ativo || m.status === 'ativo');
   const totalMembros = filteredMembros.length;
   const congregacoesAtivas = congregacoes.filter((c) => c.ativa);
@@ -94,7 +120,6 @@ export default function Dashboard() {
     .filter((m) => {
       if (!m.data_nascimento) return false;
       const dataNasc = new Date(`${m.data_nascimento}T00:00:00`);
-      const hoje = new Date();
       return dataNasc.getMonth() === hoje.getMonth();
     })
     .slice(0, 5);
@@ -168,31 +193,94 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <Card key={index} className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow">
-              <div
-                className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.color} opacity-10 rounded-full transform translate-x-10 -translate-y-10`}
-              />
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">{stat.title}</p>
-                    <CardTitle className="text-3xl font-bold mt-2">{stat.value}</CardTitle>
-                  </div>
-                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
-                    <stat.icon className="w-6 h-6 text-white" />
-                  </div>
+        {/* Crescimento mensal */}
+        {!loadingMembros && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <UserPlus className="w-5 h-5 text-blue-600" />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center text-sm">
-                  <TrendingUp className="w-4 h-4 mr-1 text-green-500" />
-                  <span className="text-slate-600">{stat.trend}</span>
+                <div>
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Novos este mês</p>
+                  <p className="text-2xl font-bold text-slate-900">{novosEsteMes}</p>
                 </div>
               </CardContent>
             </Card>
-          ))}
+
+            <Card className="border-0 shadow-md bg-gradient-to-br from-slate-50 to-slate-100">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="p-3 bg-slate-200 rounded-xl">
+                  <TrendingUp className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Mês anterior</p>
+                  <p className="text-2xl font-bold text-slate-900">{novosMesAnterior}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50 to-green-50">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${crescimentoDiff >= 0 ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                  {crescimentoDiff >= 0
+                    ? <ArrowUp className="w-5 h-5 text-emerald-600" />
+                    : <ArrowDown className="w-5 h-5 text-red-600" />
+                  }
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Variação</p>
+                  <p className={`text-2xl font-bold ${crescimentoDiff >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                    {crescimentoDiff >= 0 ? '+' : ''}{crescimentoDiff}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {loadingMembros
+            ? Array.from({ length: 4 }).map((_, i) => (
+                <Card key={i} className="border-0 shadow-lg">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-8 w-12" />
+                      </div>
+                      <Skeleton className="w-12 h-12 rounded-xl" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-24" />
+                  </CardContent>
+                </Card>
+              ))
+            : stats.map((stat, index) => (
+                <Card key={index} className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <div
+                    className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.color} opacity-10 rounded-full transform translate-x-10 -translate-y-10`}
+                  />
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-medium text-slate-500">{stat.title}</p>
+                        <CardTitle className="text-3xl font-bold mt-2">{stat.value}</CardTitle>
+                      </div>
+                      <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
+                        <stat.icon className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center text-sm">
+                      <TrendingUp className="w-4 h-4 mr-1 text-green-500" />
+                      <span className="text-slate-600">{stat.trend}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
         </div>
 
         <Card className="shadow-lg border-0">
@@ -256,7 +344,19 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              {aniversariantesDoMes.length > 0 ? (
+              {loadingMembros ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="w-10 h-10 rounded-full" />
+                      <div className="space-y-1 flex-1">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : aniversariantesDoMes.length > 0 ? (
                 <div className="space-y-4">
                   {aniversariantesDoMes.map((membro) => (
                     <div
@@ -308,7 +408,19 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-6">
-              {membrosRecentes.length > 0 ? (
+              {loadingMembros ? (
+                <div className="space-y-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <Skeleton className="w-10 h-10 rounded-full" />
+                      <div className="space-y-1 flex-1">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : membrosRecentes.length > 0 ? (
                 <div className="space-y-4">
                   {membrosRecentes.map((membro) => (
                     <div
@@ -362,14 +474,25 @@ export default function Dashboard() {
             <CardTitle>Distribuição por Tipo</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(membrosPorTipo).map(([tipo, count]) => (
-                <div key={tipo} className="text-center p-4 bg-slate-50 rounded-lg">
-                  <p className="text-3xl font-bold text-slate-900">{count}</p>
-                  <p className="text-sm text-slate-500 capitalize mt-1">{`${tipo}s`}</p>
-                </div>
-              ))}
-            </div>
+            {loadingMembros ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="text-center p-4 bg-slate-50 rounded-lg space-y-2">
+                    <Skeleton className="h-9 w-12 mx-auto" />
+                    <Skeleton className="h-4 w-20 mx-auto" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(membrosPorTipo).map(([tipo, count]) => (
+                  <div key={tipo} className="text-center p-4 bg-slate-50 rounded-lg">
+                    <p className="text-3xl font-bold text-slate-900">{count}</p>
+                    <p className="text-sm text-slate-500 capitalize mt-1">{`${tipo}s`}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
