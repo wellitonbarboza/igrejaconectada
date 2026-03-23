@@ -601,8 +601,11 @@ export const base44 = {
           await assertAdminForPhotoUpload();
         }
 
-        const authToken = getRequiredAuthToken();
-        const apiKey = SUPABASE_ANON_KEY;
+        // Use service role key when available to bypass storage RLS policies.
+        // The admin guard above already enforces permission at the application level.
+        const useServiceRole = !!(SUPABASE_SERVICE_ROLE_KEY);
+        const authToken = useServiceRole ? getAdminAuthToken() : getRequiredAuthToken();
+        const apiKey = useServiceRole ? getAdminApiKey() : SUPABASE_ANON_KEY;
         const extension = file.name?.split('.').pop() || 'bin';
         const fileName =
           path ||
@@ -641,8 +644,9 @@ export const base44 = {
           await assertAdminForPhotoUpload();
         }
 
-        const authToken = getRequiredAuthToken();
-        const apiKey = SUPABASE_ANON_KEY;
+        const useServiceRole = !!(SUPABASE_SERVICE_ROLE_KEY);
+        const authToken = useServiceRole ? getAdminAuthToken() : getRequiredAuthToken();
+        const apiKey = useServiceRole ? getAdminApiKey() : SUPABASE_ANON_KEY;
         const encodedPath = path
           .split('/')
           .map((segment) => encodeURIComponent(segment))

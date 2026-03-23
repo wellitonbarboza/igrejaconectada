@@ -364,7 +364,7 @@ export default function ModalMembro({
       setPendingFotoPreview('');
     } catch (error) {
       console.error('Erro ao salvar membro com foto:', error);
-      setUploadError('Não foi possível salvar a foto. Tente novamente.');
+      setUploadError(error?.message || 'Não foi possível salvar a foto. Tente novamente.');
     } finally {
       setUploading(false);
     }
