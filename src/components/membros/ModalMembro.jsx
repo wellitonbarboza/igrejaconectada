@@ -299,6 +299,17 @@ export default function ModalMembro({
     setFotoEditorOpen(true);
   };
 
+  // Tries to upload to storage bucket; returns storage payload or null on failure.
+  const tryStorageUpload = async (file, membroId) => {
+    try {
+      const { file_url, filePath } = await uploadFotoFile(file, membroId);
+      return { foto_url: file_url, foto_path: filePath, foto_bucket: STORAGE_BUCKETS.fotosMembros };
+    } catch (err) {
+      console.warn('Upload para storage falhou, usando base64 como fallback:', err.message);
+      return null;
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setUploadError('');
@@ -312,17 +323,36 @@ export default function ModalMembro({
     setUploading(true);
 
     try {
-      // Embed photo as base64 data URI — no external storage needed.
-      if (isAdmin && pendingFotoDataUrl) {
-        dataToSave = {
-          ...dataToSave,
-          foto_url: pendingFotoDataUrl,
-          foto_path: null,
-          foto_bucket: null,
-        };
+      if (isAdmin && pendingFotoFile && pendingFotoDataUrl) {
+        if (!membro) {
+          // New member: save with base64 first to guarantee data is persisted,
+          // then try to upgrade to storage in a second update.
+          const created = await saveMutation.mutateAsync({
+            ...dataToSave,
+            foto_url: pendingFotoDataUrl,
+            foto_path: null,
+            foto_bucket: null,
+          });
+          const createdRecord = Array.isArray(created) ? created[0] : created;
+          if (createdRecord?.id) {
+            const storagePayload = await tryStorageUpload(pendingFotoFile, createdRecord.id);
+            if (storagePayload) {
+              await base44.entities.Membro.update(createdRecord.id, storagePayload);
+            }
+          }
+        } else {
+          // Existing member: try storage first, fall back to base64.
+          const storagePayload = await tryStorageUpload(pendingFotoFile, membro.id);
+          const fotoPayload = storagePayload ?? {
+            foto_url: pendingFotoDataUrl,
+            foto_path: null,
+            foto_bucket: null,
+          };
+          await saveMutation.mutateAsync({ ...dataToSave, ...fotoPayload });
+        }
+      } else {
+        await saveMutation.mutateAsync(dataToSave);
       }
-
-      await saveMutation.mutateAsync(dataToSave);
 
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(DRAFT_KEY);
@@ -334,8 +364,8 @@ export default function ModalMembro({
       setPendingFotoPreview('');
       setPendingFotoDataUrl('');
     } catch (error) {
-      console.error('Erro ao salvar membro com foto:', error);
-      setUploadError(error?.message || 'Não foi possível salvar a foto. Tente novamente.');
+      console.error('Erro ao salvar membro:', error);
+      setUploadError(error?.message || 'Não foi possível salvar. Tente novamente.');
     } finally {
       setUploading(false);
     }
