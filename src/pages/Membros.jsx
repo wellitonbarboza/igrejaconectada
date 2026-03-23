@@ -12,11 +12,14 @@ import {
   Edit,
   MoreVertical,
   Archive,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -43,6 +46,10 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 import { isArchivedMember } from '@/utils/memberStatus';
+import { useDebounce } from '@/hooks/useDebounce';
+import { usePagination } from '@/hooks/usePagination';
+
+const PAGE_SIZE = 20;
 
 export default function Membros() {
   const navigate = useNavigate();
@@ -56,6 +63,8 @@ export default function Membros() {
   const [showModal, setShowModal] = useState(false);
   const [membroSelecionado, setMembroSelecionado] = useState(null);
   const editHandledRef = useRef(false);
+
+  const debouncedSearch = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -104,10 +113,12 @@ export default function Membros() {
   const activeMembros = membros.filter((membro) => !isArchivedMember(membro));
 
   const filteredMembros = activeMembros.filter((membro) => {
+    const term = debouncedSearch.toLowerCase();
     const matchesSearch =
-      membro.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      membro.telefone?.includes(searchTerm) ||
-      membro.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      !term ||
+      membro.nome_completo?.toLowerCase().includes(term) ||
+      membro.telefone?.includes(term) ||
+      membro.email?.toLowerCase().includes(term);
 
     const matchesTipo = tipoFiltro === 'todos' || membro.tipo === tipoFiltro;
     const matchesStatus = statusFiltro === 'todos' || membro.status === statusFiltro;
@@ -130,6 +141,16 @@ export default function Membros() {
     const direction = ordenacaoFiltro === 'az' ? 1 : -1;
     return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' }) * direction;
   });
+
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems,
+    goToPage,
+    hasNext,
+    hasPrev,
+    totalItems,
+  } = usePagination(sortedMembros, PAGE_SIZE);
 
   const handleEdit = (membro) => {
     setMembroSelecionado(membro);
@@ -176,6 +197,8 @@ export default function Membros() {
     };
     return colors[status] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
+
+  const colSpan = isAdmin ? 7 : 6;
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
@@ -302,19 +325,33 @@ export default function Membros() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="w-9 h-9 rounded-full" />
+                            <div className="space-y-1">
+                              <Skeleton className="h-4 w-36" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                        {isAdmin && <TableCell><Skeleton className="h-4 w-28" /></TableCell>}
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell />
+                      </TableRow>
+                    ))
+                  ) : paginatedItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8">
-                        Carregando...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredMembros.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={colSpan} className="text-center py-8 text-slate-500">
                         Nenhum membro encontrado
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sortedMembros.map((membro) => (
+                    paginatedItems.map((membro) => (
                       <TableRow
                         key={membro.id}
                         className="hover:bg-slate-50 cursor-pointer"
@@ -395,6 +432,35 @@ export default function Membros() {
                 </TableBody>
               </Table>
             </div>
+
+            {!isLoading && totalItems > PAGE_SIZE && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+                <p className="text-sm text-slate-500">
+                  Exibindo {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} de {totalItems} membros
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={!hasPrev}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm text-slate-700 font-medium">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={!hasNext}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
