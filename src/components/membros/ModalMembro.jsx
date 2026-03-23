@@ -39,6 +39,7 @@ export default function ModalMembro({
   const [pendingFotoPreview, setPendingFotoPreview] = useState('');
   const [rawFotoFile, setRawFotoFile] = useState(null);
   const [rawFotoPreview, setRawFotoPreview] = useState('');
+  const [pendingFotoDataUrl, setPendingFotoDataUrl] = useState('');
   const [fotoEditorOpen, setFotoEditorOpen] = useState(false);
   const [fotoEditorZoom, setFotoEditorZoom] = useState(1);
   const [recordingField, setRecordingField] = useState(null);
@@ -293,7 +294,7 @@ export default function ModalMembro({
     event.preventDefault();
     setUploadError('');
 
-    const dataToSave = { ...formData };
+    let dataToSave = { ...formData };
     if (!isAdmin && membro) {
       dataToSave.foto_url = membro.foto_url || '';
       dataToSave.foto_path = membro.foto_path || '';
@@ -302,57 +303,17 @@ export default function ModalMembro({
     setUploading(true);
 
     try {
-      if (!membro) {
-        const createdMembro = await saveMutation.mutateAsync({
+      // Embed photo as base64 data URI — no external storage needed.
+      if (isAdmin && pendingFotoDataUrl) {
+        dataToSave = {
           ...dataToSave,
-          foto_url: '',
-          foto_path: '',
-          foto_bucket: STORAGE_BUCKETS.fotosMembros,
-        });
-
-        const createdRecord = Array.isArray(createdMembro) ? createdMembro[0] : createdMembro;
-        if (isAdmin && pendingFotoFile && createdRecord?.id) {
-          const { file_url, filePath } = await uploadFotoFile(pendingFotoFile, createdRecord.id);
-          await base44.entities.Membro.update(createdRecord.id, {
-            foto_url: file_url,
-            foto_path: filePath,
-            foto_bucket: STORAGE_BUCKETS.fotosMembros,
-          });
-        }
-      } else {
-        let payload = dataToSave;
-        const previousFotoPath = membro.foto_path;
-        const previousFotoBucket = membro.foto_bucket || STORAGE_BUCKETS.fotosMembros;
-
-        if (isAdmin && pendingFotoFile) {
-          const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
-          payload = {
-            ...payload,
-            foto_url: file_url,
-            foto_path: filePath,
-            foto_bucket: STORAGE_BUCKETS.fotosMembros,
-          };
-        }
-
-        await saveMutation.mutateAsync(payload);
-
-        const shouldDeleteOldPhoto =
-          isAdmin &&
-          pendingFotoFile &&
-          previousFotoPath &&
-          previousFotoPath !== payload.foto_path;
-
-        if (shouldDeleteOldPhoto) {
-          try {
-            await base44.integrations.Core.DeleteFile({
-              bucket: previousFotoBucket,
-              path: previousFotoPath,
-            });
-          } catch (deleteError) {
-            console.warn('Não foi possível remover a foto antiga do membro.', deleteError);
-          }
-        }
+          foto_url: pendingFotoDataUrl,
+          foto_path: null,
+          foto_bucket: null,
+        };
       }
+
+      await saveMutation.mutateAsync(dataToSave);
 
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(DRAFT_KEY);
@@ -362,6 +323,7 @@ export default function ModalMembro({
       onClose();
       setPendingFotoFile(null);
       setPendingFotoPreview('');
+      setPendingFotoDataUrl('');
     } catch (error) {
       console.error('Erro ao salvar membro com foto:', error);
       setUploadError(error?.message || 'Não foi possível salvar a foto. Tente novamente.');
@@ -543,6 +505,7 @@ export default function ModalMembro({
           context.fillRect(0, 0, size, size);
           context.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
 
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
           canvas.toBlob(
             (blob) => {
               if (!blob) {
@@ -553,10 +516,10 @@ export default function ModalMembro({
               const editedFile = new File([blob], `foto-editada.${extension}`, {
                 type: blob.type,
               });
-              resolve(editedFile);
+              resolve({ file: editedFile, dataUrl });
             },
             'image/jpeg',
-            0.9
+            0.82
           );
         };
         image.src = reader.result;
@@ -567,13 +530,14 @@ export default function ModalMembro({
   const handleConfirmFotoEdit = async () => {
     if (!rawFotoFile) return;
     try {
-      const editedFile = await createEditedFotoFile(rawFotoFile, fotoEditorZoom);
+      const { file: editedFile, dataUrl } = await createEditedFotoFile(rawFotoFile, fotoEditorZoom);
       if (pendingFotoPreview) {
         URL.revokeObjectURL(pendingFotoPreview);
       }
       const previewUrl = URL.createObjectURL(editedFile);
       setPendingFotoFile(editedFile);
       setPendingFotoPreview(previewUrl);
+      setPendingFotoDataUrl(dataUrl);
       setPreviewFailed(false);
       setFotoEditorOpen(false);
       setRawFotoFile(null);
@@ -678,11 +642,12 @@ export default function ModalMembro({
                           }
                           setPendingFotoFile(null);
                           setPendingFotoPreview('');
+                          setPendingFotoDataUrl('');
                           updateFormData((prev) => ({
                             ...prev,
                             foto_url: '',
                             foto_path: '',
-                            foto_bucket: STORAGE_BUCKETS.fotosMembros,
+                            foto_bucket: null,
                           }));
                         }}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
