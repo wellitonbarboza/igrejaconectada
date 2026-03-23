@@ -42,6 +42,13 @@ export default function ModalMembro({
   const [pendingFotoDataUrl, setPendingFotoDataUrl] = useState('');
   const [fotoEditorOpen, setFotoEditorOpen] = useState(false);
   const [fotoEditorZoom, setFotoEditorZoom] = useState(1);
+  const [fotoOffsetX, setFotoOffsetX] = useState(0);
+  const [fotoOffsetY, setFotoOffsetY] = useState(0);
+  const [editorReady, setEditorReady] = useState(false);
+  const previewCanvasRef = useRef(null);
+  const editorImageRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, offsetX: 0, offsetY: 0 });
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
@@ -287,6 +294,8 @@ export default function ModalMembro({
     setRawFotoFile(file);
     setRawFotoPreview(previewUrl);
     setFotoEditorZoom(1);
+    setFotoOffsetX(0);
+    setFotoOffsetY(0);
     setFotoEditorOpen(true);
   };
 
@@ -477,63 +486,97 @@ export default function ModalMembro({
     };
   }, [pendingFotoPreview, rawFotoPreview]);
 
-  const createEditedFotoFile = (file, zoom) =>
+  // Load the raw image into a reusable Image object for the canvas editor.
+  useEffect(() => {
+    if (!rawFotoPreview) {
+      editorImageRef.current = null;
+      setEditorReady(false);
+      return;
+    }
+    setEditorReady(false);
+    const img = new Image();
+    img.onload = () => {
+      editorImageRef.current = img;
+      setEditorReady(true);
+    };
+    img.onerror = () => setEditorReady(false);
+    img.src = rawFotoPreview;
+  }, [rawFotoPreview]);
+
+  // Redraw the preview canvas whenever zoom, offset, or image changes.
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    const image = editorImageRef.current;
+    if (!canvas || !image || !fotoEditorOpen || !editorReady) return;
+    const size = canvas.width; // 280
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const baseScale = Math.max(size / image.width, size / image.height);
+    const scaledW = image.width * baseScale * fotoEditorZoom;
+    const scaledH = image.height * baseScale * fotoEditorZoom;
+    const dx = (size - scaledW) / 2 + fotoOffsetX;
+    const dy = (size - scaledH) / 2 + fotoOffsetY;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(image, dx, dy, scaledW, scaledH);
+  }, [fotoEditorZoom, fotoOffsetX, fotoOffsetY, fotoEditorOpen, editorReady]);
+
+  const handleEditorMouseDown = (e) => {
+    isDraggingRef.current = true;
+    dragStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, offsetX: fotoOffsetX, offsetY: fotoOffsetY };
+  };
+  const handleEditorMouseMove = (e) => {
+    if (!isDraggingRef.current) return;
+    setFotoOffsetX(dragStartRef.current.offsetX + (e.clientX - dragStartRef.current.mouseX));
+    setFotoOffsetY(dragStartRef.current.offsetY + (e.clientY - dragStartRef.current.mouseY));
+  };
+  const handleEditorMouseEnd = () => { isDraggingRef.current = false; };
+  const handleEditorTouchStart = (e) => {
+    const t = e.touches[0];
+    isDraggingRef.current = true;
+    dragStartRef.current = { mouseX: t.clientX, mouseY: t.clientY, offsetX: fotoOffsetX, offsetY: fotoOffsetY };
+  };
+  const handleEditorTouchMove = (e) => {
+    e.preventDefault();
+    if (!isDraggingRef.current) return;
+    const t = e.touches[0];
+    setFotoOffsetX(dragStartRef.current.offsetX + (t.clientX - dragStartRef.current.mouseX));
+    setFotoOffsetY(dragStartRef.current.offsetY + (t.clientY - dragStartRef.current.mouseY));
+  };
+
+  // Renders the current editor state to a 512×512 canvas and returns { dataUrl, blob }.
+  const renderOutputCanvas = () =>
     new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = reject;
-      reader.onload = () => {
-        const image = new Image();
-        image.onerror = reject;
-        image.onload = () => {
-          const size = 512;
-          const canvas = document.createElement('canvas');
-          canvas.width = size;
-          canvas.height = size;
-          const context = canvas.getContext('2d');
-          if (!context) {
-            reject(new Error('Não foi possível preparar o editor de imagem.'));
-            return;
-          }
-
-          const scale = Math.max(size / image.width, size / image.height) * zoom;
-          const scaledWidth = image.width * scale;
-          const scaledHeight = image.height * scale;
-          const offsetX = (size - scaledWidth) / 2;
-          const offsetY = (size - scaledHeight) / 2;
-
-          context.fillStyle = '#ffffff';
-          context.fillRect(0, 0, size, size);
-          context.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error('Não foi possível gerar a imagem editada.'));
-                return;
-              }
-              const extension = file.name?.split('.').pop() || 'jpg';
-              const editedFile = new File([blob], `foto-editada.${extension}`, {
-                type: blob.type,
-              });
-              resolve({ file: editedFile, dataUrl });
-            },
-            'image/jpeg',
-            0.82
-          );
-        };
-        image.src = reader.result;
-      };
-      reader.readAsDataURL(file);
+      const image = editorImageRef.current;
+      if (!image) { reject(new Error('Nenhuma imagem carregada.')); return; }
+      const PREVIEW = 280;
+      const OUTPUT = 512;
+      const ratio = OUTPUT / PREVIEW;
+      const canvas = document.createElement('canvas');
+      canvas.width = OUTPUT;
+      canvas.height = OUTPUT;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Canvas não disponível.')); return; }
+      const baseScale = Math.max(OUTPUT / image.width, OUTPUT / image.height);
+      const scaledW = image.width * baseScale * fotoEditorZoom;
+      const scaledH = image.height * baseScale * fotoEditorZoom;
+      const dx = (OUTPUT - scaledW) / 2 + fotoOffsetX * ratio;
+      const dy = (OUTPUT - scaledH) / 2 + fotoOffsetY * ratio;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, OUTPUT, OUTPUT);
+      ctx.drawImage(image, dx, dy, scaledW, scaledH);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error('Falha ao gerar imagem.')); return; }
+        resolve({ dataUrl, blob });
+      }, 'image/jpeg', 0.82);
     });
 
   const handleConfirmFotoEdit = async () => {
-    if (!rawFotoFile) return;
     try {
-      const { file: editedFile, dataUrl } = await createEditedFotoFile(rawFotoFile, fotoEditorZoom);
-      if (pendingFotoPreview) {
-        URL.revokeObjectURL(pendingFotoPreview);
-      }
+      const { dataUrl, blob } = await renderOutputCanvas();
+      const editedFile = new File([blob], 'foto-editada.jpg', { type: 'image/jpeg' });
+      if (pendingFotoPreview) URL.revokeObjectURL(pendingFotoPreview);
       const previewUrl = URL.createObjectURL(editedFile);
       setPendingFotoFile(editedFile);
       setPendingFotoPreview(previewUrl);
@@ -541,23 +584,22 @@ export default function ModalMembro({
       setPreviewFailed(false);
       setFotoEditorOpen(false);
       setRawFotoFile(null);
-      if (rawFotoPreview) {
-        URL.revokeObjectURL(rawFotoPreview);
-      }
+      if (rawFotoPreview) URL.revokeObjectURL(rawFotoPreview);
       setRawFotoPreview('');
     } catch (error) {
       console.error('Erro ao preparar a foto:', error);
+      setUploadError('Não foi possível processar a foto. Tente novamente.');
     }
   };
 
   const handleCancelFotoEdit = () => {
     setFotoEditorOpen(false);
     setRawFotoFile(null);
-    if (rawFotoPreview) {
-      URL.revokeObjectURL(rawFotoPreview);
-    }
+    if (rawFotoPreview) URL.revokeObjectURL(rawFotoPreview);
     setRawFotoPreview('');
     setFotoEditorZoom(1);
+    setFotoOffsetX(0);
+    setFotoOffsetY(0);
   };
 
   const currentFotoUrl = resolveMemberPhotoUrl(formData);
@@ -1408,56 +1450,76 @@ export default function ModalMembro({
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={fotoEditorOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCancelFotoEdit();
-          }
-        }}
-      >
-        <DialogContent className="max-w-xl">
+      <Dialog open={fotoEditorOpen} onOpenChange={(open) => { if (!open) handleCancelFotoEdit(); }}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Pré-visualizar e editar foto</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Enquadrar foto</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-sm text-slate-500">
+              Arraste para reposicionar. Use o controle de zoom para ajustar o tamanho.
+            </p>
+
             <div className="flex justify-center">
-              {rawFotoPreview ? (
-                <div className="w-64 h-64 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                  <img
-                    src={rawFotoPreview}
-                    alt="Pré-visualização da foto"
-                    className="w-full h-full object-cover"
-                    style={{ transform: `scale(${fotoEditorZoom})` }}
-                  />
-                </div>
-              ) : (
-                <div className="w-64 h-64 rounded-xl border border-dashed border-slate-300 flex items-center justify-center text-sm text-slate-500">
-                  Nenhuma imagem selecionada
-                </div>
-              )}
+              <div className="relative select-none">
+                {/* Canvas de preview — renderiza exatamente o que será salvo */}
+                <canvas
+                  ref={previewCanvasRef}
+                  width={280}
+                  height={280}
+                  className="rounded-lg block bg-slate-100"
+                  style={{ width: '280px', height: '280px', touchAction: 'none', cursor: isDraggingRef.current ? 'grabbing' : 'grab' }}
+                  onMouseDown={handleEditorMouseDown}
+                  onMouseMove={handleEditorMouseMove}
+                  onMouseUp={handleEditorMouseEnd}
+                  onMouseLeave={handleEditorMouseEnd}
+                  onTouchStart={handleEditorTouchStart}
+                  onTouchMove={handleEditorTouchMove}
+                  onTouchEnd={handleEditorMouseEnd}
+                />
+                {/* Overlay de contorno */}
+                <div className="absolute inset-0 rounded-lg border-2 border-white/70 pointer-events-none" />
+                {/* Marcadores de canto */}
+                <div className="absolute top-2 left-2 w-5 h-5 border-t-[3px] border-l-[3px] border-white pointer-events-none" />
+                <div className="absolute top-2 right-2 w-5 h-5 border-t-[3px] border-r-[3px] border-white pointer-events-none" />
+                <div className="absolute bottom-2 left-2 w-5 h-5 border-b-[3px] border-l-[3px] border-white pointer-events-none" />
+                <div className="absolute bottom-2 right-2 w-5 h-5 border-b-[3px] border-r-[3px] border-white pointer-events-none" />
+                {!editorReady && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-slate-100">
+                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="foto-zoom">Zoom</Label>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="foto-zoom" className="text-sm">Zoom</Label>
+                <span className="text-xs text-slate-500">{fotoEditorZoom.toFixed(2)}×</span>
+              </div>
               <input
                 id="foto-zoom"
                 type="range"
                 min="1"
-                max="2.5"
-                step="0.1"
+                max="3"
+                step="0.02"
                 value={fotoEditorZoom}
-                onChange={(event) => setFotoEditorZoom(Number(event.target.value))}
-                className="w-full"
+                onChange={(e) => setFotoEditorZoom(Number(e.target.value))}
+                className="w-full accent-blue-600"
+                autoComplete="off"
               />
-              <div className="text-xs text-slate-500">Ajuste o enquadramento antes de salvar.</div>
             </div>
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleCancelFotoEdit}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={handleConfirmFotoEdit} disabled={!rawFotoFile}>
+              <Button
+                type="button"
+                onClick={handleConfirmFotoEdit}
+                disabled={!editorReady}
+                className="bg-gradient-to-r from-blue-500 to-purple-600"
+              >
                 Aplicar foto
               </Button>
             </div>
