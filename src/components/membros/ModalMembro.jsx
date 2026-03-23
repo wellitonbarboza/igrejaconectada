@@ -656,7 +656,7 @@ export default function ModalMembro({
           <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <Label>Foto do Membro</Label>
+              <Label htmlFor="foto-upload">Foto do Membro</Label>
               <div className="mt-2 flex items-center gap-4">
                 {fotoPreview ? (
                   <div className="relative">
@@ -746,6 +746,7 @@ export default function ModalMembro({
                   value={formData.nome_completo}
                   onChange={(e) => handleChange('nome_completo', e.target.value)}
                   required
+                  autoComplete="name"
                   className="pr-10"
                 />
                 <button
@@ -766,7 +767,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="tipo">Tipo *</Label>
               <Select value={formData.tipo} onValueChange={(value) => handleChange('tipo', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="tipo">
                   <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -781,7 +782,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="origem">Origem *</Label>
               <Select value={formData.origem} onValueChange={(value) => handleChange('origem', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="origem">
                   <SelectValue placeholder="Origem" />
                 </SelectTrigger>
                 <SelectContent>
@@ -845,7 +846,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="status">Status *</Label>
               <Select value={formData.status} onValueChange={(value) => handleChange('status', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="status">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -860,7 +861,7 @@ export default function ModalMembro({
               <div>
                 <Label htmlFor="congregacao_id">Congregação *</Label>
                 <Select value={formData.congregacao_id || ''} onValueChange={(value) => handleChange('congregacao_id', value)}>
-                  <SelectTrigger>
+                  <SelectTrigger id="congregacao_id">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -887,7 +888,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="nacionalidade">Nacionalidade</Label>
               <Select value={formData.nacionalidade} onValueChange={(value) => handleChange('nacionalidade', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="nacionalidade">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -986,7 +987,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="sexo">Sexo</Label>
               <Select value={formData.sexo} onValueChange={(value) => handleChange('sexo', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="sexo">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -999,7 +1000,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="estado_civil">Estado Civil</Label>
               <Select value={formData.estado_civil} onValueChange={(value) => handleChange('estado_civil', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="estado_civil">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1039,7 +1040,7 @@ export default function ModalMembro({
                 <div>
                   <Label htmlFor="conjuge_tipo">Cônjuge é</Label>
                   <Select value={formData.conjuge_tipo} onValueChange={(value) => handleChange('conjuge_tipo', value)}>
-                    <SelectTrigger>
+                    <SelectTrigger id="conjuge_tipo">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -1084,6 +1085,7 @@ export default function ModalMembro({
                 value={formData.telefone}
                 onChange={(e) => handleChange('telefone', e.target.value)}
                 placeholder="(00) 00000-0000"
+                autoComplete="tel"
               />
             </div>
 
@@ -1094,6 +1096,7 @@ export default function ModalMembro({
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
+                autoComplete="email"
               />
             </div>
 
@@ -1115,7 +1118,7 @@ export default function ModalMembro({
             <div>
               <Label htmlFor="escolaridade">Escolaridade</Label>
               <Select value={formData.escolaridade} onValueChange={(value) => handleChange('escolaridade', value)}>
-                <SelectTrigger>
+                <SelectTrigger id="escolaridade">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1335,7 +1338,7 @@ export default function ModalMembro({
               <div className="md:col-span-2 bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <Label htmlFor="cargo_obreiro">Cargo de Obreiro</Label>
                 <Select value={formData.cargo_obreiro} onValueChange={(value) => handleChange('cargo_obreiro', value)}>
-                  <SelectTrigger className="mt-2">
+                  <SelectTrigger id="cargo_obreiro" className="mt-2">
                     <SelectValue placeholder="Selecione o cargo..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1363,7 +1366,7 @@ export default function ModalMembro({
 
             <div className="md:col-span-2">
               <div className="flex items-center justify-between gap-4">
-                <Label>Departamentos</Label>
+                <Label id="label-departamentos">Departamentos</Label>
                 <Button
                   type="button"
                   variant="ghost"
@@ -1375,16 +1378,18 @@ export default function ModalMembro({
                 </Button>
               </div>
               <p className="text-xs text-slate-500 mt-1">Você pode selecionar mais de um departamento.</p>
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <div role="group" aria-labelledby="label-departamentos" className="mt-3 grid gap-2 md:grid-cols-2">
                 {departamentosDisponiveis.length === 0 ? (
                   <p className="text-sm text-slate-500">Nenhum departamento disponível.</p>
                 ) : (
                   departamentosDisponiveis.map((dept) => (
                     <label
                       key={dept.id}
+                      htmlFor={`dept-check-${dept.id}`}
                       className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm text-slate-700"
                     >
                       <Checkbox
+                        id={`dept-check-${dept.id}`}
                         checked={formData.departamentos_ids?.includes(dept.id)}
                         onCheckedChange={() => handleDepartamentoToggle(dept.id)}
                       />
