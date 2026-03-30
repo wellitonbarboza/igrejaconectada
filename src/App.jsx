@@ -76,7 +76,7 @@ export default function App() {
       <Route path={createPageUrl('Login')} element={<LoginRoute />} />
       <Route element={<ProtectedShell />}>
         <Route index element={<Navigate to={createPageUrl('Dashboard')} replace />} />
-        <Route path={createPageUrl('Dashboard')} element={<ProtectedRoute page="Dashboard"><Dashboard /></ProtectedRoute>} />
+        <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
         <Route path={createPageUrl('Membros')} element={<ProtectedRoute page="Membros"><Membros /></ProtectedRoute>} />
         <Route path={createPageUrl('DetalhesMembro')} element={<ProtectedRoute page="DetalhesMembro"><DetalhesMembro /></ProtectedRoute>} />
         <Route path={createPageUrl('ArquivoMorto')} element={<ProtectedRoute page="ArquivoMorto"><ArquivoMorto /></ProtectedRoute>} />

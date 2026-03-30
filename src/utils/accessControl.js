@@ -75,7 +75,7 @@ export const getResolvedPermissions = (user) => {
 
   const custom = user.permissions;
   if (custom && typeof custom === 'object' && !Array.isArray(custom) && Object.keys(custom).length > 0) {
-    return custom;
+    return { ...ALWAYS_ACCESSIBLE_PAGES, ...custom };
   }
 
   // Compatibilidade: se permissions é um array antigo de strings, converte
@@ -85,11 +85,17 @@ export const getResolvedPermissions = (user) => {
       const pageDef = ALL_MANAGEABLE_PAGES.find((p) => p.page === page);
       converted[page] = pageDef ? [...pageDef.actions] : ['view'];
     });
-    return converted;
+    return { ...ALWAYS_ACCESSIBLE_PAGES, ...converted };
   }
 
   return { ...DEFAULT_USUARIO_PERMISSIONS };
 };
+
+/**
+ * Páginas que devem sempre estar acessíveis (landing page).
+ * Dashboard é a rota padrão de redirecionamento após login e para rotas sem acesso.
+ */
+const ALWAYS_ACCESSIBLE_PAGES = { Dashboard: ['view'] };
 
 /**
  * Verifica se o usuário tem acesso a uma página (qualquer ação, mínimo "view").
