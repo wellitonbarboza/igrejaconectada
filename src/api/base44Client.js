@@ -598,12 +598,18 @@ export const base44 = {
           throw new Error('Nenhum arquivo selecionado');
         }
 
-        if (bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares) {
+        const isPhotoBucket =
+          bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares;
+
+        if (isPhotoBucket) {
           await assertAdminForPhotoUpload();
         }
 
-        const authToken = getRequiredAuthToken();
-        const apiKey = SUPABASE_ANON_KEY;
+        // Photo buckets use the service role key to bypass RLS policies that
+        // may not have been applied correctly.  Admin permission is already
+        // validated above by assertAdminForPhotoUpload().
+        const authToken = isPhotoBucket ? getAdminAuthToken() : getRequiredAuthToken();
+        const apiKey = isPhotoBucket ? getAdminApiKey() : SUPABASE_ANON_KEY;
         const extension = file.name?.split('.').pop() || 'bin';
         const fileName =
           path ||
@@ -638,12 +644,15 @@ export const base44 = {
         assertSupabaseEnv();
         if (!path) return null;
 
-        if (bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares) {
+        const isPhotoBucket =
+          bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares;
+
+        if (isPhotoBucket) {
           await assertAdminForPhotoUpload();
         }
 
-        const authToken = getRequiredAuthToken();
-        const apiKey = SUPABASE_ANON_KEY;
+        const authToken = isPhotoBucket ? getAdminAuthToken() : getRequiredAuthToken();
+        const apiKey = isPhotoBucket ? getAdminApiKey() : SUPABASE_ANON_KEY;
         const encodedPath = path
           .split('/')
           .map((segment) => encodeURIComponent(segment))
