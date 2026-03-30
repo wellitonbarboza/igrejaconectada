@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ModalCongregacao from '@/components/congregacoes/ModalCongregacao.jsx';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function Congregacoes() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function Congregacoes() {
   const [showModal, setShowModal] = useState(false);
   const [congregacaoSelecionada, setCongregacaoSelecionada] = useState(null);
   const editHandledRef = useRef(false);
+  const perms = usePermissions('Congregacoes');
 
   const { data: congregacoes = [], isLoading } = useQuery({
     queryKey: ['congregacoes'],
@@ -109,16 +111,18 @@ export default function Congregacoes() {
             </h1>
             <p className="text-slate-500 mt-1">Gerencie todas as congregações da igreja</p>
           </div>
-          <Button
-            onClick={() => {
-              setCongregacaoSelecionada(null);
-              setShowModal(true);
-            }}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Congregação
-          </Button>
+          {perms.canCreate && (
+            <Button
+              onClick={() => {
+                setCongregacaoSelecionada(null);
+                setShowModal(true);
+              }}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Congregação
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -129,10 +133,12 @@ export default function Congregacoes() {
               <Building2 className="w-16 h-16 mx-auto mb-4 text-slate-300" />
               <h3 className="text-xl font-semibold text-slate-900 mb-2">Nenhuma congregação cadastrada</h3>
               <p className="text-slate-500 mb-6">Comece criando a primeira congregação</p>
-              <Button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-500 to-purple-600">
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Primeira Congregação
-              </Button>
+              {perms.canCreate && (
+                <Button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-500 to-purple-600">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Criar Primeira Congregação
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -154,6 +160,7 @@ export default function Congregacoes() {
                         </span>
                       </div>
                     </div>
+                    {(perms.canEdit || perms.canDelete) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
@@ -161,27 +168,32 @@ export default function Congregacoes() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleEdit(congregacao);
-                          }}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDelete(congregacao.id);
-                          }}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
+                        {perms.canEdit && (
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleEdit(congregacao);
+                            }}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+                        {perms.canDelete && (
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDelete(congregacao.id);
+                            }}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">

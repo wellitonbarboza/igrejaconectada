@@ -19,6 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
 import ieadLogo from '@/assets/iead-logo.svg';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function Cartas() {
   const { user } = useAuth();
@@ -39,6 +40,7 @@ export default function Cartas() {
   const lastSavedHistoricoIdRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
+  const perms = usePermissions('Cartas');
 
   const { data: membros = [] } = useQuery({
     queryKey: ['membros'],
@@ -718,6 +720,7 @@ export default function Cartas() {
                   </div>
                 )}
 
+                {(perms.canCreate || (perms.canEdit && historicoEditando)) && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <Button
                     onClick={() => setShowPreview(true)}
@@ -728,6 +731,7 @@ export default function Cartas() {
                     {historicoEditando ? 'Atualizar Carta' : 'Gerar Carta'}
                   </Button>
                 </div>
+                )}
 
                 {historicoEditando && (
                   <Button variant="outline" onClick={limparFormulario}>
@@ -772,20 +776,24 @@ export default function Cartas() {
                             </p>
                           </div>
                           <div className="flex gap-2 shrink-0">
-                            <Button size="icon" variant="outline" onClick={() => carregarCartaParaEdicao(carta)}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
+                            {perms.canEdit && (
+                              <Button size="icon" variant="outline" onClick={() => carregarCartaParaEdicao(carta)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button size="icon" variant="outline" onClick={() => handleBaixarHistorico(carta)}>
                               <Download className="w-4 h-4" />
                             </Button>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => handleExcluirHistorico(carta)}
-                              disabled={deleteHistoricoMutation.isPending}
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </Button>
+                            {perms.canDelete && (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => handleExcluirHistorico(carta)}
+                                disabled={deleteHistoricoMutation.isPending}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>

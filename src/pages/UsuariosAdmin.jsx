@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, UserPlus, Shield, Mail, Trash2 } from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, Trash2, KeyRound, Eye, PenLine, Plus, Trash, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { Navigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import {
+  ALL_MANAGEABLE_PAGES,
+  ACTION_LABELS,
+  getResolvedPermissions,
+} from '@/utils/accessControl';
 
 const SUPER_ADMIN_EMAIL = 'welliton.tec@hotmail.com';
+
+const ACTION_ICONS = {
+  view: Eye,
+  create: Plus,
+  edit: PenLine,
+  delete: Trash,
+};
 
 const defaultNovoUsuario = {
   full_name: '',
@@ -29,6 +42,8 @@ export default function UsuariosAdmin() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [novoUsuario, setNovoUsuario] = useState(defaultNovoUsuario);
+  const [permissionsTarget, setPermissionsTarget] = useState(null);
+  const [editingPermissions, setEditingPermissions] = useState({});
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -65,6 +80,20 @@ export default function UsuariosAdmin() {
     mutationFn: ({ id, cargo }) => base44.entities.Perfil.update(id, { cargo }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+    },
+  });
+
+  const updatePermissionsMutation = useMutation({
+    mutationFn: ({ id, permissions }) => base44.entities.Perfil.update(id, { permissions }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+      setPermissionsTarget(null);
+      setEditingPermissions({});
+      alert('Permissões atualizadas com sucesso.');
+    },
+    onError: (error) => {
+      console.error('Erro ao atualizar permissões:', error);
+      alert('Não foi possível atualizar as permissões.');
     },
   });
 
@@ -124,6 +153,72 @@ export default function UsuariosAdmin() {
     });
   };
 
+  // --- Permissions Modal Logic ---
+
+  const openPermissionsModal = (usuario) => {
+    setPermissionsTarget(usuario);
+    setEditingPermissions(getResolvedPermissions(usuario));
+  };
+
+  const isPageEnabled = (page) => {
+    return Array.isArray(editingPermissions[page]) && editingPermissions[page].length > 0;
+  };
+
+  const isActionEnabled = (page, action) => {
+    return Array.isArray(editingPermissions[page]) && editingPermissions[page].includes(action);
+  };
+
+  const togglePage = (page, availableActions) => {
+    setEditingPermissions((prev) => {
+      const next = { ...prev };
+      if (isPageEnabled(page)) {
+        delete next[page];
+      } else {
+        next[page] = [...availableActions];
+      }
+      return next;
+    });
+  };
+
+  const toggleAction = (page, action) => {
+    setEditingPermissions((prev) => {
+      const current = prev[page] || [];
+      let updated;
+      if (current.includes(action)) {
+        updated = current.filter((a) => a !== action);
+      } else {
+        updated = [...current, action];
+      }
+      const next = { ...prev };
+      if (updated.length === 0) {
+        delete next[page];
+      } else {
+        next[page] = updated;
+      }
+      return next;
+    });
+  };
+
+  const handleGrantAll = () => {
+    const allPerms = {};
+    ALL_MANAGEABLE_PAGES.forEach(({ page, actions }) => {
+      allPerms[page] = [...actions];
+    });
+    setEditingPermissions(allPerms);
+  };
+
+  const handleRevokeAll = () => {
+    setEditingPermissions({});
+  };
+
+  const handleSavePermissions = () => {
+    if (!permissionsTarget) return;
+    updatePermissionsMutation.mutate({
+      id: permissionsTarget.id,
+      permissions: editingPermissions,
+    });
+  };
+
   if (user?.role !== 'admin') {
     return <Navigate to={createPageUrl('Dashboard')} replace />;
   }
@@ -149,6 +244,17 @@ export default function UsuariosAdmin() {
     },
   ];
 
+  const describePermissions = (usuario) => {
+    if (usuario.role === 'admin') return 'Acesso total';
+    const perms = usuario.permissions;
+    if (perms && typeof perms === 'object' && !Array.isArray(perms) && Object.keys(perms).length > 0) {
+      const pages = Object.keys(perms).length;
+      const totalActions = Object.values(perms).reduce((sum, acts) => sum + (Array.isArray(acts) ? acts.length : 0), 0);
+      return `${pages} pág. / ${totalActions} ações`;
+    }
+    return 'Padrão';
+  };
+
   return (
     <div className="p-4 md:p-8 min-h-screen">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -159,7 +265,7 @@ export default function UsuariosAdmin() {
               Administração de Usuários
             </h1>
             <p className="text-slate-500 mt-2">
-              Cadastre usuários, defina nível de acesso e cargo operacional de cada pessoa.
+              Cadastre usuários, defina nível de acesso, cargo e permissões detalhadas de cada pessoa.
             </p>
           </div>
           <Button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-500 to-purple-600">
@@ -201,6 +307,7 @@ export default function UsuariosAdmin() {
                     <TableHead>Email</TableHead>
                     <TableHead>Cargo</TableHead>
                     <TableHead>Nível</TableHead>
+                    <TableHead>Permissões</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -235,6 +342,23 @@ export default function UsuariosAdmin() {
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={usuario.role === 'admin' ? 'default' : 'secondary'} className="text-xs whitespace-nowrap">
+                            {describePermissions(usuario)}
+                          </Badge>
+                          {usuario.role !== 'admin' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Editar permissões"
+                              onClick={() => openPermissionsModal(usuario)}
+                            >
+                              <KeyRound className="w-4 h-4 text-blue-600" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
@@ -254,6 +378,7 @@ export default function UsuariosAdmin() {
         </Card>
       </div>
 
+      {/* Modal: Novo Usuário */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent>
           <DialogHeader>
@@ -327,6 +452,117 @@ export default function UsuariosAdmin() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Editar Permissões CRUD */}
+      <Dialog open={!!permissionsTarget} onOpenChange={(open) => { if (!open) { setPermissionsTarget(null); setEditingPermissions({}); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-blue-600" />
+              Permissões de Acesso
+            </DialogTitle>
+          </DialogHeader>
+
+          {permissionsTarget && (
+            <div className="space-y-5">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="font-semibold text-slate-900">{permissionsTarget.full_name || 'Usuário'}</p>
+                <p className="text-sm text-slate-500">{permissionsTarget.email}</p>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold text-slate-700">Páginas e ações permitidas</Label>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={handleGrantAll}>
+                    Liberar tudo
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={handleRevokeAll}>
+                    Revogar tudo
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {ALL_MANAGEABLE_PAGES.map(({ page, label, actions }) => {
+                  const enabled = isPageEnabled(page);
+                  return (
+                    <div
+                      key={page}
+                      className={`rounded-lg border transition-colors ${
+                        enabled ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      {/* Page toggle row */}
+                      <label className="flex items-center gap-3 p-3 cursor-pointer">
+                        <Checkbox
+                          checked={enabled}
+                          onCheckedChange={() => togglePage(page, actions)}
+                        />
+                        <span className={`text-sm font-semibold ${enabled ? 'text-blue-800' : 'text-slate-600'}`}>
+                          {label}
+                        </span>
+                        {enabled && (
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {editingPermissions[page]?.length || 0} de {actions.length}
+                          </Badge>
+                        )}
+                      </label>
+
+                      {/* CRUD action toggles */}
+                      {enabled && actions.length > 1 && (
+                        <div className="border-t border-blue-100 px-3 py-2 flex flex-wrap gap-2">
+                          {actions.map((action) => {
+                            const ActionIcon = ACTION_ICONS[action];
+                            const active = isActionEnabled(page, action);
+                            return (
+                              <button
+                                key={action}
+                                type="button"
+                                onClick={() => toggleAction(page, action)}
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                                  active
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}
+                              >
+                                {ActionIcon && <ActionIcon className="w-3 h-3" />}
+                                {ACTION_LABELS[action]}
+                                {active && <Check className="w-3 h-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-800">
+                  <strong>Nota:</strong> Usuários com nível "Administrador" têm acesso total a tudo
+                  independente destas configurações. As permissões acima se aplicam apenas a
+                  usuários com nível "Usuário". Páginas desmarcadas ficam ocultas no menu.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => { setPermissionsTarget(null); setEditingPermissions({}); }}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSavePermissions}
+                  disabled={updatePermissionsMutation.isPending}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600"
+                >
+                  {updatePermissionsMutation.isPending ? 'Salvando...' : 'Salvar permissões'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

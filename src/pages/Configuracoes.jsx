@@ -9,11 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '@/utils/imageCompression';
 import ieadLogo from '@/assets/iead-logo.svg';
+import usePermissions from '@/hooks/usePermissions';
 
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const perms = usePermissions('Configuracoes');
 
   const { data: configs = [] } = useQuery({
     queryKey: ['configs'],
@@ -121,6 +123,14 @@ export default function Configuracoes() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <fieldset disabled={!perms.canEdit}>
+          {!perms.canEdit && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-800">
+                Você tem permissão apenas para visualizar as configurações. Entre em contato com um administrador para alterações.
+              </p>
+            </div>
+          )}
           <Card className="shadow-lg border-0">
             <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
               <CardTitle className="flex items-center gap-2">
@@ -256,16 +266,19 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button
-              type="submit"
-              className="bg-gradient-to-r from-blue-500 to-purple-600"
-              disabled={saveMutation.isPending}
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {saveMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
-            </Button>
-          </div>
+          {perms.canEdit && (
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                className="bg-gradient-to-r from-blue-500 to-purple-600"
+                disabled={saveMutation.isPending}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saveMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
+              </Button>
+            </div>
+          )}
+          </fieldset>
         </form>
       </div>
     </div>
