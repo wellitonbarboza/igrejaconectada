@@ -12,12 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function ArquivoMorto() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const perms = usePermissions('ArquivoMorto');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('todos');
@@ -138,16 +140,20 @@ export default function ArquivoMorto() {
                     <Button variant="outline" size="sm" onClick={() => navigate(`${createPageUrl('DetalhesMembro')}?id=${membro.id}`)}>
                       <Eye className="w-4 h-4 mr-1" /> Ver
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`${createPageUrl('Membros')}?action=editar&id=${membro.id}`)}>
-                      <Edit className="w-4 h-4 mr-1" /> Editar
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => reativarMutation.mutate(membro.id)}
-                      disabled={reativarMutation.isPending}
-                    >
-                      <ArchiveRestore className="w-4 h-4 mr-1" /> Reativar
-                    </Button>
+                    {perms.canEdit && (
+                      <Button variant="outline" size="sm" onClick={() => navigate(`${createPageUrl('Membros')}?action=editar&id=${membro.id}`)}>
+                        <Edit className="w-4 h-4 mr-1" /> Editar
+                      </Button>
+                    )}
+                    {perms.canEdit && (
+                      <Button
+                        size="sm"
+                        onClick={() => reativarMutation.mutate(membro.id)}
+                        disabled={reativarMutation.isPending}
+                      >
+                        <ArchiveRestore className="w-4 h-4 mr-1" /> Reativar
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))

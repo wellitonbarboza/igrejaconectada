@@ -48,6 +48,7 @@ import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 import { isArchivedMember } from '@/utils/memberStatus';
 import { useDebounce } from '@/hooks/useDebounce';
 import { usePagination } from '@/hooks/usePagination';
+import usePermissions from '@/hooks/usePermissions';
 
 const PAGE_SIZE = 20;
 
@@ -74,6 +75,7 @@ export default function Membros() {
   }, []);
 
   const isAdmin = user?.role === 'admin';
+  const perms = usePermissions('Membros');
 
   const { data: membros = [], isLoading } = useQuery({
     queryKey: ['membros'],
@@ -220,16 +222,18 @@ export default function Membros() {
             >
               Arquivo Morto
             </Button>
-            <Button
-              onClick={() => {
-                setMembroSelecionado(null);
-                setShowModal(true);
-              }}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Novo Membro
-            </Button>
+            {perms.canCreate && (
+              <Button
+                onClick={() => {
+                  setMembroSelecionado(null);
+                  setShowModal(true);
+                }}
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Novo Membro
+              </Button>
+            )}
           </div>
         </div>
 
@@ -404,25 +408,29 @@ export default function Membros() {
                                 <Eye className="w-4 h-4 mr-2" />
                                 Visualizar
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleEdit(membro);
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleArchive(membro);
-                                }}
-                                className="text-red-600"
-                              >
-                                <Archive className="w-4 h-4 mr-2" />
-                                Arquivar
-                              </DropdownMenuItem>
+                              {perms.canEdit && (
+                                <DropdownMenuItem
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleEdit(membro);
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                              )}
+                              {perms.canDelete && (
+                                <DropdownMenuItem
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleArchive(membro);
+                                  }}
+                                  className="text-red-600"
+                                >
+                                  <Archive className="w-4 h-4 mr-2" />
+                                  Arquivar
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>

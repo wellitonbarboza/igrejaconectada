@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import ModalDepartamento from '@/components/departamentos/ModalDepartamento.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function Departamentos() {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function Departamentos() {
   const editHandledRef = useRef(false);
 
   const isAdmin = user?.role === 'admin';
+  const perms = usePermissions('Departamentos');
 
   const { data: departamentos = [], isLoading } = useQuery({
     queryKey: ['departamentos'],
@@ -117,16 +119,18 @@ export default function Departamentos() {
             </h1>
             <p className="text-slate-500 mt-1">Organize os departamentos e ministérios da igreja</p>
           </div>
-          <Button
-            onClick={() => {
-              setDepartamentoSelecionado(null);
-              setShowModal(true);
-            }}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Departamento
-          </Button>
+          {perms.canCreate && (
+            <Button
+              onClick={() => {
+                setDepartamentoSelecionado(null);
+                setShowModal(true);
+              }}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Departamento
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
@@ -137,10 +141,12 @@ export default function Departamentos() {
               <GitBranch className="w-16 h-16 mx-auto mb-4 text-slate-300" />
               <h3 className="text-xl font-semibold text-slate-900 mb-2">Nenhum departamento cadastrado</h3>
               <p className="text-slate-500 mb-6">Comece criando o primeiro departamento da sua igreja</p>
-              <Button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-500 to-purple-600">
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Primeiro Departamento
-              </Button>
+              {perms.canCreate && (
+                <Button onClick={() => setShowModal(true)} className="bg-gradient-to-r from-blue-500 to-purple-600">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Criar Primeiro Departamento
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -159,6 +165,7 @@ export default function Departamentos() {
                         <p className="text-sm text-slate-500 mt-1">{departamento.congregacao_nome}</p>
                       )}
                     </div>
+                    {(perms.canEdit || perms.canDelete) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
@@ -166,27 +173,32 @@ export default function Departamentos() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleEdit(departamento);
-                          }}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDelete(departamento.id);
-                          }}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
+                        {perms.canEdit && (
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleEdit(departamento);
+                            }}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+                        {perms.canDelete && (
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDelete(departamento.id);
+                            }}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
