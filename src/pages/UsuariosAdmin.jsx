@@ -93,7 +93,14 @@ export default function UsuariosAdmin() {
     },
     onError: (error) => {
       console.error('Erro ao atualizar permissões:', error);
-      alert('Não foi possível atualizar as permissões.');
+      const msg = error?.message || '';
+      if (msg.includes('permissions') || msg.includes('column')) {
+        alert(
+          'Erro ao salvar permissões. Verifique se a migration "add_permissions_to_profiles" foi aplicada no banco de dados Supabase.'
+        );
+      } else {
+        alert(`Não foi possível atualizar as permissões.${msg ? ` Detalhes: ${msg}` : ''}`);
+      }
     },
   });
 
@@ -213,9 +220,13 @@ export default function UsuariosAdmin() {
 
   const handleSavePermissions = () => {
     if (!permissionsTarget) return;
+    // Se não há nenhuma página selecionada, salva null para usar permissões padrão
+    const permissionsToSave = Object.keys(editingPermissions).length > 0
+      ? editingPermissions
+      : null;
     updatePermissionsMutation.mutate({
       id: permissionsTarget.id,
-      permissions: editingPermissions,
+      permissions: permissionsToSave,
     });
   };
 
