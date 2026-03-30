@@ -88,14 +88,11 @@ export default function Cartas() {
 
   const config = configs[0];
 
-  const filteredMembros = (isAdmin ? membros : membros.filter((m) => m.congregacao_id === user?.congregacao_id)).filter(
+  const filteredMembros = membros.filter(
     (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const historicoFiltrado = useMemo(() => {
-    if (isAdmin) return cartasEmitidas;
-    return cartasEmitidas.filter((item) => item.congregacao_id === user?.congregacao_id);
-  }, [cartasEmitidas, isAdmin, user?.congregacao_id]);
+  const historicoFiltrado = cartasEmitidas;
 
   const limparFormulario = () => {
     setHistoricoEditando(null);

@@ -45,7 +45,6 @@ export default function ArquivoMorto() {
   const arquivados = useMemo(() => {
     return membros
       .filter((membro) => isArchivedMember(membro))
-      .filter((membro) => (isAdmin ? true : membro.congregacao_id === user?.congregacao_id))
       .filter((membro) => {
         const search = searchTerm.toLowerCase();
         const matchesSearch =
@@ -98,21 +97,19 @@ export default function ArquivoMorto() {
                 ))}
               </SelectContent>
             </Select>
-            {isAdmin && (
-              <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Congregação" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as congregações</SelectItem>
-                  {congregacoes.map((congregacao) => (
-                    <SelectItem key={congregacao.id} value={congregacao.id}>
-                      {congregacao.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
+              <SelectTrigger>
+                <SelectValue placeholder="Congregação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as congregações</SelectItem>
+                {congregacoes.map((congregacao) => (
+                  <SelectItem key={congregacao.id} value={congregacao.id}>
+                    {congregacao.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
 
