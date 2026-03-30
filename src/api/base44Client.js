@@ -284,6 +284,7 @@ function mergeAuthAndProfile(authUser, profile) {
       profile?.full_name || authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
     role: profile?.role || 'usuario',
     cargo: profile?.cargo || '',
+    permissions: profile?.permissions || null,
   };
 }
 
