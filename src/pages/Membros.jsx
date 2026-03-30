@@ -92,6 +92,7 @@ export default function Membros() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('action') !== 'editar' || editHandledRef.current) return;
+    if (!perms.canEdit) return;
     const membroId = params.get('id');
     if (!membroId || membros.length === 0) return;
     const membro = membros.find((item) => item.id === membroId);
@@ -99,7 +100,7 @@ export default function Membros() {
     setMembroSelecionado(membro);
     setShowModal(true);
     editHandledRef.current = true;
-  }, [membros]);
+  }, [membros, perms.canEdit]);
 
   const archiveMutation = useMutation({
     mutationFn: ({ id, status }) =>
@@ -471,6 +472,7 @@ export default function Membros() {
           congregacoes={congregacoes}
           userCongregacaoId={user?.congregacao_id}
           isAdmin={isAdmin}
+          readOnly={membroSelecionado ? !perms.canEdit : !perms.canCreate}
         />
       )}
     </div>

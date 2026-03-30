@@ -7,9 +7,11 @@ import { ArrowLeft, Building2, Mail, MapPin, Phone, User, Users, Edit } from 'lu
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function DetalhesCongregacao() {
   const navigate = useNavigate();
+  const perms = usePermissions('Congregacoes');
   const urlParams = new URLSearchParams(window.location.search);
   const congregacaoId = urlParams.get('id');
 
@@ -70,13 +72,15 @@ export default function DetalhesCongregacao() {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-slate-900">Detalhes da Congregação</h1>
           </div>
-          <Button
-            onClick={() => navigate(`${createPageUrl('Congregacoes')}?action=editar&id=${congregacao.id}`)}
-            className="bg-gradient-to-r from-blue-500 to-purple-600"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
+          {perms.canEdit && (
+            <Button
+              onClick={() => navigate(`${createPageUrl('Congregacoes')}?action=editar&id=${congregacao.id}`)}
+              className="bg-gradient-to-r from-blue-500 to-purple-600"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+          )}
         </div>
 
         <Card className="shadow-lg border-0">

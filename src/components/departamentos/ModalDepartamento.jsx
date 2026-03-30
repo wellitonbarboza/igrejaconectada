@@ -25,7 +25,7 @@ const CORES_PADRAO = [
   { nome: 'Vermelho', valor: '#ef4444' },
 ];
 
-export default function ModalDepartamento({ departamento, onClose, membros, userCongregacaoId, isAdmin }) {
+export default function ModalDepartamento({ departamento, onClose, membros, userCongregacaoId, isAdmin, readOnly = false }) {
   const DRAFT_KEY = 'draft_departamento';
   const queryClient = useQueryClient();
   const defaultFormData = {
@@ -185,7 +185,8 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
+        <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-6 px-6 pb-6">
+          <fieldset disabled={readOnly}>
           <div className="space-y-4">
             <div>
               <Label htmlFor="nome">Nome do Departamento *</Label>
@@ -291,17 +292,22 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
               </div>
             </div>
           </div>
+          </fieldset>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
+              {readOnly ? 'Fechar' : 'Cancelar'}
             </Button>
-            <Button type="button" variant="outline" onClick={handleSaveDraft}>
-              Rascunho
-            </Button>
-            <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
-            </Button>
+            {!readOnly && (
+              <>
+                <Button type="button" variant="outline" onClick={handleSaveDraft}>
+                  Rascunho
+                </Button>
+                <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </>
+            )}
           </div>
         </form>
       </DialogContent>

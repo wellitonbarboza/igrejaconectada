@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-export default function ModalCongregacao({ congregacao, onClose }) {
+export default function ModalCongregacao({ congregacao, onClose, readOnly = false }) {
   const DRAFT_KEY = 'draft_congregacao';
   const queryClient = useQueryClient();
   const defaultFormData = {
@@ -99,7 +99,8 @@ export default function ModalCongregacao({ congregacao, onClose }) {
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 px-6 pb-6">
+        <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-6 px-6 pb-6">
+          <fieldset disabled={readOnly}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label htmlFor="nome">Nome da Congregação *</Label>
@@ -162,17 +163,22 @@ export default function ModalCongregacao({ congregacao, onClose }) {
               />
             </div>
           </div>
+          </fieldset>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
+              {readOnly ? 'Fechar' : 'Cancelar'}
             </Button>
-            <Button type="button" variant="outline" onClick={handleSaveDraft}>
-              Rascunho
-            </Button>
-            <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
-            </Button>
+            {!readOnly && (
+              <>
+                <Button type="button" variant="outline" onClick={handleSaveDraft}>
+                  Rascunho
+                </Button>
+                <Button type="submit" className="bg-gradient-to-r from-blue-500 to-purple-600" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </>
+            )}
           </div>
         </form>
       </DialogContent>

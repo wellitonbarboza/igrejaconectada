@@ -50,6 +50,7 @@ export default function Departamentos() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('action') !== 'editar' || editHandledRef.current) return;
+    if (!perms.canEdit) return;
     const departamentoId = params.get('id');
     if (!departamentoId || departamentos.length === 0) return;
     const departamento = departamentos.find((item) => item.id === departamentoId);
@@ -57,7 +58,7 @@ export default function Departamentos() {
     setDepartamentoSelecionado(departamento);
     setShowModal(true);
     editHandledRef.current = true;
-  }, [departamentos]);
+  }, [departamentos, perms.canEdit]);
 
   const filteredDepartamentos = departamentos;
   const membrosFiltrados = membros;
@@ -233,6 +234,7 @@ export default function Departamentos() {
           membros={membros}
           userCongregacaoId={user?.congregacao_id}
           isAdmin={isAdmin}
+          readOnly={departamentoSelecionado ? !perms.canEdit : !perms.canCreate}
         />
       )}
     </div>
