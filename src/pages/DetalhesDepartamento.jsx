@@ -7,9 +7,11 @@ import { ArrowLeft, Edit, GitBranch, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function DetalhesDepartamento() {
   const navigate = useNavigate();
+  const perms = usePermissions('Departamentos');
   const urlParams = new URLSearchParams(window.location.search);
   const departamentoId = urlParams.get('id');
 
@@ -63,13 +65,15 @@ export default function DetalhesDepartamento() {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-slate-900">Detalhes do Departamento</h1>
           </div>
-          <Button
-            onClick={() => navigate(`${createPageUrl('Departamentos')}?action=editar&id=${departamento.id}`)}
-            className="bg-gradient-to-r from-blue-500 to-purple-600"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
+          {perms.canEdit && (
+            <Button
+              onClick={() => navigate(`${createPageUrl('Departamentos')}?action=editar&id=${departamento.id}`)}
+              className="bg-gradient-to-r from-blue-500 to-purple-600"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+          )}
         </div>
 
         <Card className="shadow-lg border-0">

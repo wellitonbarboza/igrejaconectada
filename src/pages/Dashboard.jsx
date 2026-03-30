@@ -11,10 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
+import usePermissions from '@/hooks/usePermissions';
 import ieadLogo from '@/assets/iead-logo.svg';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const membrosPerms = usePermissions('Membros');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -174,12 +176,14 @@ export default function Dashboard() {
               Aqui está um resumo das atividades da sua igreja
             </p>
           </div>
-          <Link to={`${createPageUrl('Membros')}?action=novo`}>
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Novo Membro
-            </Button>
-          </Link>
+          {membrosPerms.canCreate && (
+            <Link to={`${createPageUrl('Membros')}?action=novo`}>
+              <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Novo Membro
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Crescimento mensal */}

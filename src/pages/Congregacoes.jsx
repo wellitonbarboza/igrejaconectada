@@ -56,6 +56,7 @@ export default function Congregacoes() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('action') !== 'editar' || editHandledRef.current) return;
+    if (!perms.canEdit) return;
     const congregacaoId = params.get('id');
     if (!congregacaoId || congregacoes.length === 0) return;
     const congregacao = congregacoes.find((item) => item.id === congregacaoId);
@@ -63,7 +64,7 @@ export default function Congregacoes() {
     setCongregacaoSelecionada(congregacao);
     setShowModal(true);
     editHandledRef.current = true;
-  }, [congregacoes]);
+  }, [congregacoes, perms.canEdit]);
 
   const handleEdit = (congregacao) => {
     setCongregacaoSelecionada(congregacao);
@@ -243,7 +244,11 @@ export default function Congregacoes() {
       </div>
 
       {showModal && (
-        <ModalCongregacao congregacao={congregacaoSelecionada} onClose={handleCloseModal} />
+        <ModalCongregacao
+          congregacao={congregacaoSelecionada}
+          onClose={handleCloseModal}
+          readOnly={congregacaoSelecionada ? !perms.canEdit : !perms.canCreate}
+        />
       )}
     </div>
   );

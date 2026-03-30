@@ -25,9 +25,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import usePermissions from '@/hooks/usePermissions';
 
 export default function DetalhesMembro() {
   const navigate = useNavigate();
+  const perms = usePermissions('Membros');
   const urlParams = new URLSearchParams(window.location.search);
   const membroId = urlParams.get('id');
 
@@ -96,13 +98,15 @@ export default function DetalhesMembro() {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-slate-900">Detalhes do Membro</h1>
           </div>
-          <Button
-            onClick={() => navigate(`${createPageUrl('Membros')}?action=editar&id=${membro.id}`)}
-            className="bg-gradient-to-r from-blue-500 to-purple-600"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
+          {perms.canEdit && (
+            <Button
+              onClick={() => navigate(`${createPageUrl('Membros')}?action=editar&id=${membro.id}`)}
+              className="bg-gradient-to-r from-blue-500 to-purple-600"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+          )}
         </div>
 
         <Card className="shadow-lg border-0">
