@@ -77,20 +77,20 @@ export default function App() {
       <Route element={<ProtectedShell />}>
         <Route index element={<Navigate to={createPageUrl('Dashboard')} replace />} />
         <Route path={createPageUrl('Dashboard')} element={<Dashboard />} />
-        <Route path={createPageUrl('Membros')} element={<Membros />} />
-        <Route path={createPageUrl('DetalhesMembro')} element={<DetalhesMembro />} />
-        <Route path={createPageUrl('ArquivoMorto')} element={<ArquivoMorto />} />
+        <Route path={createPageUrl('Membros')} element={<ProtectedRoute page="Membros"><Membros /></ProtectedRoute>} />
+        <Route path={createPageUrl('DetalhesMembro')} element={<ProtectedRoute page="DetalhesMembro"><DetalhesMembro /></ProtectedRoute>} />
+        <Route path={createPageUrl('ArquivoMorto')} element={<ProtectedRoute page="ArquivoMorto"><ArquivoMorto /></ProtectedRoute>} />
         <Route path={createPageUrl('DetalhesCongregacao')} element={<ProtectedRoute page="Congregacoes"><DetalhesCongregacao /></ProtectedRoute>} />
-        <Route path={createPageUrl('DetalhesDepartamento')} element={<DetalhesDepartamento />} />
-        <Route path={createPageUrl('Departamentos')} element={<Departamentos />} />
+        <Route path={createPageUrl('DetalhesDepartamento')} element={<ProtectedRoute page="DetalhesDepartamento"><DetalhesDepartamento /></ProtectedRoute>} />
+        <Route path={createPageUrl('Departamentos')} element={<ProtectedRoute page="Departamentos"><Departamentos /></ProtectedRoute>} />
         <Route path={createPageUrl('Congregacoes')} element={<ProtectedRoute page="Congregacoes"><Congregacoes /></ProtectedRoute>} />
-        <Route path={createPageUrl('Relatorios')} element={<Relatorios />} />
-        <Route path={createPageUrl('Cartoes')} element={<Cartoes />} />
+        <Route path={createPageUrl('Relatorios')} element={<ProtectedRoute page="Relatorios"><Relatorios /></ProtectedRoute>} />
+        <Route path={createPageUrl('Cartoes')} element={<ProtectedRoute page="Cartoes"><Cartoes /></ProtectedRoute>} />
         <Route path={createPageUrl('Configuracoes')} element={<ProtectedRoute page="Configuracoes"><Configuracoes /></ProtectedRoute>} />
-        <Route path={createPageUrl('Cartas')} element={<Cartas />} />
+        <Route path={createPageUrl('Cartas')} element={<ProtectedRoute page="Cartas"><Cartas /></ProtectedRoute>} />
         <Route path={createPageUrl('Usuarios')} element={<ProtectedRoute page="Usuarios"><UsuariosAdmin /></ProtectedRoute>} />
         <Route path={createPageUrl('Download')} element={<Navigate to={`${createPageUrl('Download')}/mobile`} replace />} />
-        <Route path={`${createPageUrl('Download')}/:platform`} element={<Download />} />
+        <Route path={`${createPageUrl('Download')}/:platform`} element={<ProtectedRoute page="Download"><Download /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={createPageUrl('Dashboard')} replace />} />
       </Route>
     </Routes>
