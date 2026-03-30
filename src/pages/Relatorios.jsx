@@ -36,9 +36,7 @@ export default function Relatorios() {
     initialData: [],
   });
 
-  const filteredMembros = isAdmin
-    ? membros
-    : membros.filter((m) => m.congregacao_id === user?.congregacao_id);
+  const filteredMembros = membros;
 
   const aniversariantes = filteredMembros
     .filter((m) => {

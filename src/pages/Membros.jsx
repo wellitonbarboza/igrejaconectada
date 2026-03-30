@@ -126,14 +126,11 @@ export default function Membros() {
     const matchesStatus = statusFiltro === 'todos' || membro.status === statusFiltro;
     const matchesCongregacao =
       congregacaoFiltro === 'todas' || membro.congregacao_id === congregacaoFiltro;
-    const matchesUserCongregacao = isAdmin || membro.congregacao_id === user?.congregacao_id;
-
     return (
       matchesSearch &&
       matchesTipo &&
       matchesStatus &&
-      matchesCongregacao &&
-      matchesUserCongregacao
+      matchesCongregacao
     );
   });
 
@@ -200,7 +197,7 @@ export default function Membros() {
     return colors[status] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
-  const colSpan = isAdmin ? 7 : 6;
+  const colSpan = 7;
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
@@ -212,7 +209,7 @@ export default function Membros() {
               Membros
             </h1>
             <p className="text-slate-500 mt-1">
-              Gerencie os membros ativos da sua {isAdmin ? 'igreja' : 'congregação'}
+              Gerencie os membros ativos da sua igreja
             </p>
           </div>
           <div className="flex gap-2">
@@ -245,9 +242,7 @@ export default function Membros() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div
-              className={`grid grid-cols-1 gap-4 ${isAdmin ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
-            >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
@@ -293,21 +288,19 @@ export default function Membros() {
                 </SelectContent>
               </Select>
 
-              {isAdmin && (
-                <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Congregação" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas as congregações</SelectItem>
-                    {congregacoes.map((cong) => (
-                      <SelectItem key={cong.id} value={cong.id}>
-                        {cong.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Congregação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as congregações</SelectItem>
+                  {congregacoes.map((cong) => (
+                    <SelectItem key={cong.id} value={cong.id}>
+                      {cong.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -321,7 +314,7 @@ export default function Membros() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Status</TableHead>
-                    {isAdmin && <TableHead>Congregação</TableHead>}
+                    <TableHead>Congregação</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead>Data Cadastro</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -342,7 +335,7 @@ export default function Membros() {
                         </TableCell>
                         <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                        {isAdmin && <TableCell><Skeleton className="h-4 w-28" /></TableCell>}
+                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell />
@@ -382,11 +375,9 @@ export default function Membros() {
                             {membro.status}
                           </Badge>
                         </TableCell>
-                        {isAdmin && (
-                          <TableCell className="text-slate-600">
-                            {membro.congregacao_nome || '-'}
-                          </TableCell>
-                        )}
+                        <TableCell className="text-slate-600">
+                          {membro.congregacao_nome || '-'}
+                        </TableCell>
                         <TableCell className="text-slate-600">{membro.telefone || '-'}</TableCell>
                         <TableCell className="text-slate-600">
                           {membro.created_date ? format(new Date(membro.created_date), 'dd/MM/yyyy') : '-'}

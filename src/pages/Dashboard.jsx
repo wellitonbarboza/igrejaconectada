@@ -61,7 +61,7 @@ export default function Dashboard() {
     queryKey: ['congregacoes'],
     queryFn: () => base44.entities.Congregacao.list('-created_date'),
     initialData: [],
-    enabled: isAdmin,
+    enabled: true,
   });
 
   const { data: departamentos = [] } = useQuery({
@@ -70,15 +70,8 @@ export default function Dashboard() {
     initialData: [],
   });
 
-  const filteredMembros = isAdmin
-    ? membros
-    : membros.filter((m) => m.congregacao_id === user?.congregacao_id);
-
-  const filteredDepartamentos = isAdmin
-    ? departamentos
-    : departamentos.filter(
-        (d) => !d.congregacao_id || d.congregacao_id === user?.congregacao_id
-      );
+  const filteredMembros = membros;
+  const filteredDepartamentos = departamentos;
 
   const hoje = new Date();
   const primeiroDiaMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -146,17 +139,13 @@ export default function Dashboard() {
       color: 'from-blue-500 to-blue-600',
       trend: `${membrosAtivos.length} ativos`,
     },
-    ...(isAdmin
-      ? [
-          {
-            title: 'Congregações',
-            value: congregacoes.length,
-            icon: Building2,
-            color: 'from-purple-500 to-purple-600',
-            trend: `${congregacoesAtivas.length} ativas`,
-          },
-        ]
-      : []),
+    {
+      title: 'Congregações',
+      value: congregacoes.length,
+      icon: Building2,
+      color: 'from-purple-500 to-purple-600',
+      trend: `${congregacoesAtivas.length} ativas`,
+    },
     {
       title: 'Departamentos',
       value: filteredDepartamentos.length,
@@ -182,7 +171,7 @@ export default function Dashboard() {
               Bem-vindo de volta! 👋
             </h1>
             <p className="text-slate-500 mt-2">
-              Aqui está um resumo das atividades da sua {isAdmin ? 'igreja' : 'congregação'}
+              Aqui está um resumo das atividades da sua igreja
             </p>
           </div>
           <Link to={`${createPageUrl('Membros')}?action=novo`}>

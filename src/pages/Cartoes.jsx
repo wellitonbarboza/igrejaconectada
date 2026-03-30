@@ -29,10 +29,10 @@ export default function Cartoes() {
   });
 
   const filteredMembros = useMemo(() => (
-    (isAdmin ? membros : membros.filter((m) => m.congregacao_id === user?.congregacao_id)).filter(
+    membros.filter(
       (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
     )
-  ), [membros, isAdmin, user?.congregacao_id, searchTerm]);
+  ), [membros, searchTerm]);
 
   const toggleMembro = (membroId) => {
     setMembrosSelecionados((prev) =>

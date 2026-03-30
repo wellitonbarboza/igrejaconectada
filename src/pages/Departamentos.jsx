@@ -59,15 +59,8 @@ export default function Departamentos() {
     editHandledRef.current = true;
   }, [departamentos]);
 
-  const filteredDepartamentos = isAdmin
-    ? departamentos
-    : departamentos.filter(
-        (d) => !d.congregacao_id || d.congregacao_id === user?.congregacao_id
-      );
-
-  const membrosFiltrados = isAdmin
-    ? membros
-    : membros.filter((m) => m.congregacao_id === user?.congregacao_id);
+  const filteredDepartamentos = departamentos;
+  const membrosFiltrados = membros;
 
   const membrosPorDepartamento = useMemo(() => {
     return membrosFiltrados.reduce((acc, membro) => {
