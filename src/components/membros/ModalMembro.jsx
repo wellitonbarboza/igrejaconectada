@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
-import { compressImage } from '@/utils/imageCompression';
-import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -22,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import FotoMembroUpload, { uploadMemberPhoto } from './FotoMembroUpload';
 
 export default function ModalMembro({
   membro,
@@ -35,22 +34,11 @@ export default function ModalMembro({
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
-  const [previewFailed, setPreviewFailed] = useState(false);
-  const [pendingFotoFile, setPendingFotoFile] = useState(null);
-  const [pendingFotoPreview, setPendingFotoPreview] = useState('');
-  const [rawFotoFile, setRawFotoFile] = useState(null);
-  const [rawFotoPreview, setRawFotoPreview] = useState('');
-  const [fotoEditorOpen, setFotoEditorOpen] = useState(false);
-  const [fotoEditorZoom, setFotoEditorZoom] = useState(1);
+  const pendingFotoFileRef = useRef(null);
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
   const didPrefillRef = useRef(false);
-  const uploadSessionIdRef = useRef(
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  );
   const normalizeOrigem = (origemValue) => {
     if (origemValue === 'transferencia') return 'transferencia_recebe';
     return origemValue;
@@ -233,77 +221,18 @@ export default function ModalMembro({
     },
   });
 
-  const uploadFotoFile = async (file, membroId = null) => {
-    if (!file) return;
-
-    const fileToUpload = await compressImage(file, { maxSize: 800, quality: 0.8 });
-    const extension = fileToUpload.name?.split('.').pop() || 'jpg';
-    const baseId = membroId || membro?.id || uploadSessionIdRef.current;
-    const filePath = `membros/${baseId}/perfil.${extension}`;
-    const { file_url, path } = await base44.integrations.Core.UploadFile({
-      file: fileToUpload,
-      bucket: STORAGE_BUCKETS.fotosMembros,
-      path: filePath,
-    });
-    return { file_url, filePath: path || filePath };
-  };
-
-  const validateFotoFile = (file) => {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSizeInBytes = 5 * 1024 * 1024;
-
-    if (!validTypes.includes(file.type)) {
-      return 'Formato inválido. Envie JPG, PNG ou WEBP.';
-    }
-
-    if (file.size > maxSizeInBytes) {
-      return 'A foto deve ter no máximo 5MB.';
-    }
-
-    return '';
-  };
-
-  const handleFotoFileChange = (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-
-    if (!file) return;
-    const validationError = validateFotoFile(file);
-    if (validationError) {
-      setUploadError(validationError);
-      return;
-    }
-
-    setUploadError('');
-
-    // Set the pending photo immediately so the preview shows right away.
-    if (pendingFotoPreview) {
-      URL.revokeObjectURL(pendingFotoPreview);
-    }
-    const previewUrl = URL.createObjectURL(file);
-    setPendingFotoFile(file);
-    setPendingFotoPreview(previewUrl);
-    setPreviewFailed(false);
-
-    // Also prepare the raw file for the editor in case the user opens it.
-    if (rawFotoPreview) {
-      URL.revokeObjectURL(rawFotoPreview);
-    }
-    setRawFotoFile(file);
-    setRawFotoPreview(URL.createObjectURL(file));
-    setFotoEditorZoom(1);
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setUploadError('');
+    setUploading(true);
 
     const dataToSave = { ...formData };
-    setUploading(true);
+    const pendingFile = pendingFotoFileRef.current;
 
     try {
       if (!membro) {
-        // Creating new member: save without photo first, then upload photo
+        // --- NOVO MEMBRO ---
+        // 1. Salva o membro sem foto
         const createdMembro = await saveMutation.mutateAsync({
           ...dataToSave,
           foto_url: '',
@@ -312,52 +241,62 @@ export default function ModalMembro({
         });
 
         const createdRecord = Array.isArray(createdMembro) ? createdMembro[0] : createdMembro;
-        if (pendingFotoFile && createdRecord?.id) {
+
+        // 2. Faz upload da foto se tiver uma selecionada
+        if (pendingFile && createdRecord?.id) {
           try {
-            const { file_url, filePath } = await uploadFotoFile(pendingFotoFile, createdRecord.id);
-            await base44.entities.Membro.update(createdRecord.id, {
-              foto_url: file_url,
-              foto_path: filePath,
-              foto_bucket: STORAGE_BUCKETS.fotosMembros,
-            });
+            const result = await uploadMemberPhoto(pendingFile, createdRecord.id);
+            if (result) {
+              await base44.entities.Membro.update(createdRecord.id, {
+                foto_url: result.file_url,
+                foto_path: result.filePath,
+                foto_bucket: STORAGE_BUCKETS.fotosMembros,
+              });
+            }
           } catch (uploadErr) {
-            console.error('Erro no upload da foto (novo membro):', uploadErr);
-            setUploadError('Membro salvo, mas não foi possível enviar a foto: ' + (uploadErr?.message || 'Erro desconhecido'));
+            console.error('[FotoUpload] Erro no upload (novo membro):', uploadErr);
+            // Membro foi salvo, mas foto falhou - não impede o fluxo
+            setUploadError('Membro salvo, mas a foto não foi enviada: ' + (uploadErr?.message || ''));
           }
         }
       } else {
-        // Editing existing member
+        // --- EDITANDO MEMBRO ---
         let payload = dataToSave;
         const previousFotoPath = membro.foto_path;
         const previousFotoBucket = membro.foto_bucket || STORAGE_BUCKETS.fotosMembros;
 
-        if (pendingFotoFile) {
+        // 1. Upload da nova foto se tiver
+        if (pendingFile) {
           try {
-            const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
-            payload = {
-              ...payload,
-              foto_url: file_url,
-              foto_path: filePath,
-              foto_bucket: STORAGE_BUCKETS.fotosMembros,
-            };
+            const result = await uploadMemberPhoto(pendingFile, membro.id);
+            if (result) {
+              payload = {
+                ...payload,
+                foto_url: result.file_url,
+                foto_path: result.filePath,
+                foto_bucket: STORAGE_BUCKETS.fotosMembros,
+              };
+            }
           } catch (uploadErr) {
-            console.error('Erro no upload da foto (edição):', uploadErr);
-            setUploadError('Não foi possível enviar a foto: ' + (uploadErr?.message || 'Erro desconhecido'));
+            console.error('[FotoUpload] Erro no upload (edição):', uploadErr);
+            setUploadError('Não foi possível enviar a foto: ' + (uploadErr?.message || ''));
             setUploading(false);
             return;
           }
         }
 
+        // 2. Salva o membro
         await saveMutation.mutateAsync(payload);
 
-        if (pendingFotoFile && previousFotoPath && previousFotoPath !== payload.foto_path) {
+        // 3. Remove foto antiga se trocou
+        if (pendingFile && previousFotoPath && previousFotoPath !== payload.foto_path) {
           try {
             await base44.integrations.Core.DeleteFile({
               bucket: previousFotoBucket,
               path: previousFotoPath,
             });
-          } catch (deleteError) {
-            console.warn('Não foi possível remover a foto antiga do membro.', deleteError);
+          } catch {
+            // Não bloqueia se falhar ao deletar a antiga
           }
         }
       }
@@ -365,13 +304,12 @@ export default function ModalMembro({
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(DRAFT_KEY);
       }
+      pendingFotoFileRef.current = null;
       queryClient.invalidateQueries({ queryKey: ['membros'] });
       queryClient.invalidateQueries({ queryKey: ['membro'] });
       onClose();
-      setPendingFotoFile(null);
-      setPendingFotoPreview('');
     } catch (error) {
-      console.error('Erro ao salvar membro:', error);
+      console.error('[FotoUpload] Erro ao salvar membro:', error);
       setUploadError('Erro ao salvar: ' + (error?.message || 'Tente novamente.'));
     } finally {
       setUploading(false);
@@ -513,101 +451,6 @@ export default function ModalMembro({
   }, [formData.origem, formData.status]);
 
   useEffect(() => {
-    return () => {
-      if (pendingFotoPreview) {
-        URL.revokeObjectURL(pendingFotoPreview);
-      }
-      if (rawFotoPreview) {
-        URL.revokeObjectURL(rawFotoPreview);
-      }
-    };
-  }, [pendingFotoPreview, rawFotoPreview]);
-
-  const createEditedFotoFile = (file, zoom) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = reject;
-      reader.onload = () => {
-        const image = new Image();
-        image.onerror = reject;
-        image.onload = () => {
-          const size = 512;
-          const canvas = document.createElement('canvas');
-          canvas.width = size;
-          canvas.height = size;
-          const context = canvas.getContext('2d');
-          if (!context) {
-            reject(new Error('Não foi possível preparar o editor de imagem.'));
-            return;
-          }
-
-          const scale = Math.max(size / image.width, size / image.height) * zoom;
-          const scaledWidth = image.width * scale;
-          const scaledHeight = image.height * scale;
-          const offsetX = (size - scaledWidth) / 2;
-          const offsetY = (size - scaledHeight) / 2;
-
-          context.fillStyle = '#ffffff';
-          context.fillRect(0, 0, size, size);
-          context.drawImage(image, offsetX, offsetY, scaledWidth, scaledHeight);
-
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error('Não foi possível gerar a imagem editada.'));
-                return;
-              }
-              const extension = file.name?.split('.').pop() || 'jpg';
-              const editedFile = new File([blob], `foto-editada.${extension}`, {
-                type: blob.type,
-              });
-              resolve(editedFile);
-            },
-            'image/jpeg',
-            0.9
-          );
-        };
-        image.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-
-  const handleConfirmFotoEdit = async () => {
-    if (!rawFotoFile) return;
-    try {
-      const editedFile = await createEditedFotoFile(rawFotoFile, fotoEditorZoom);
-      if (pendingFotoPreview) {
-        URL.revokeObjectURL(pendingFotoPreview);
-      }
-      const previewUrl = URL.createObjectURL(editedFile);
-      setPendingFotoFile(editedFile);
-      setPendingFotoPreview(previewUrl);
-      setPreviewFailed(false);
-      setFotoEditorOpen(false);
-      setRawFotoFile(null);
-      if (rawFotoPreview) {
-        URL.revokeObjectURL(rawFotoPreview);
-      }
-      setRawFotoPreview('');
-    } catch (error) {
-      console.error('Erro ao preparar a foto:', error);
-    }
-  };
-
-  const handleCancelFotoEdit = () => {
-    setFotoEditorOpen(false);
-    setRawFotoFile(null);
-    if (rawFotoPreview) {
-      URL.revokeObjectURL(rawFotoPreview);
-    }
-    setRawFotoPreview('');
-    setFotoEditorZoom(1);
-  };
-
-  const currentFotoUrl = resolveMemberPhotoUrl(formData);
-  const fotoPreview = previewFailed ? '' : pendingFotoPreview || currentFotoUrl;
-
-  useEffect(() => {
     const cepDigits = (formData.cep || '').replace(/\D/g, '');
     if (cepDigits.length !== 8) {
       setCepStatus({ loading: false, error: '' });
@@ -661,98 +504,25 @@ export default function ModalMembro({
             </DialogTitle>
           </DialogHeader>
 
-          {/* File inputs live OUTSIDE the fieldset so they are never disabled by it */}
-          <input id="foto-upload" type="file" accept="image/*" onChange={handleFotoFileChange} className="hidden" />
-          <input
-            id="foto-camera"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFotoFileChange}
-            className="hidden"
-          />
-
           <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-6 px-6 pb-6">
-          {/* Photo section is outside the fieldset so admin can always upload */}
+          {/* Foto: componente standalone, fora do fieldset para nunca ser desabilitado */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <Label>Foto do Membro</Label>
-              <div className="mt-2 flex items-center gap-4">
-                {fotoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={fotoPreview}
-                      alt="Foto"
-                      className="w-24 h-24 rounded-full object-cover border-2 border-slate-200"
-                      onError={() => {
-                        setPreviewFailed(true);
-                        setUploadError('Não foi possível carregar a foto selecionada.');
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (pendingFotoPreview) {
-                          URL.revokeObjectURL(pendingFotoPreview);
-                        }
-                        setPendingFotoFile(null);
-                        setPendingFotoPreview('');
-                        updateFormData((prev) => ({
-                          ...prev,
-                          foto_url: '',
-                          foto_path: '',
-                          foto_bucket: STORAGE_BUCKETS.fotosMembros,
-                        }));
-                      }}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-                    <Camera className="w-8 h-8 text-white" />
-                  </div>
-                )}
-                <div className="flex-1">
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('foto-upload').click()}
-                      disabled={uploading}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      {uploading ? 'Enviando...' : 'Carregar Arquivo'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('foto-camera').click()}
-                      disabled={uploading}
-                    >
-                      <Camera className="w-4 h-4 mr-2" />
-                      {uploading ? 'Enviando...' : 'Usar Câmera'}
-                    </Button>
-                    {pendingFotoFile && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setFotoEditorZoom(1);
-                          setFotoEditorOpen(true);
-                        }}
-                        disabled={uploading}
-                      >
-                        Editar Foto
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG ou WEBP. Tamanho máximo: 5MB</p>
-                  {uploadError && <p className="text-sm text-red-600 mt-1">{uploadError}</p>}
-                </div>
-              </div>
-            </div>
+            <FotoMembroUpload
+              membro={membro}
+              uploading={uploading}
+              error={uploadError}
+              onPhotoReady={(file) => {
+                pendingFotoFileRef.current = file;
+                if (!file) {
+                  updateFormData((prev) => ({
+                    ...prev,
+                    foto_url: '',
+                    foto_path: '',
+                    foto_bucket: STORAGE_BUCKETS.fotosMembros,
+                  }));
+                }
+              }}
+            />
           </div>
 
           <fieldset disabled={readOnly}><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1459,63 +1229,6 @@ export default function ModalMembro({
             )}
           </div>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={fotoEditorOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCancelFotoEdit();
-          }
-        }}
-      >
-        <DialogContent className="max-w-xl" overlayClassName="z-[60]">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Pré-visualizar e editar foto</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex justify-center">
-              {rawFotoPreview ? (
-                <div className="w-64 h-64 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                  <img
-                    src={rawFotoPreview}
-                    alt="Pré-visualização da foto"
-                    className="w-full h-full object-cover"
-                    style={{ transform: `scale(${fotoEditorZoom})` }}
-                  />
-                </div>
-              ) : (
-                <div className="w-64 h-64 rounded-xl border border-dashed border-slate-300 flex items-center justify-center text-sm text-slate-500">
-                  Nenhuma imagem selecionada
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="foto-zoom">Zoom</Label>
-              <input
-                id="foto-zoom"
-                type="range"
-                min="1"
-                max="2.5"
-                step="0.1"
-                value={fotoEditorZoom}
-                onChange={(event) => setFotoEditorZoom(Number(event.target.value))}
-                className="w-full"
-              />
-              <div className="text-xs text-slate-500">Ajuste o enquadramento antes de salvar.</div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={handleCancelFotoEdit}>
-                Cancelar
-              </Button>
-              <Button type="button" onClick={handleConfirmFotoEdit} disabled={!rawFotoFile}>
-                Aplicar foto
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
     </>
