@@ -16,13 +16,13 @@ function useDialogContext() {
   return context;
 }
 
-export function DialogContent({ className, children, ...props }) {
+export function DialogContent({ className, overlayClassName, children, ...props }) {
   const { open, onOpenChange } = useDialogContext();
 
   if (!open) return null;
 
   const content = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={clsx('fixed inset-0 z-50 flex items-center justify-center', overlayClassName)}>
       <div className="absolute inset-0 bg-slate-900/50" onClick={() => onOpenChange?.(false)} />
       <div
         className={clsx(

@@ -280,14 +280,24 @@ export default function ModalMembro({
     }
 
     setUploadError('');
+
+    // Set the pending photo immediately so the preview shows right away.
+    // The user can optionally open the editor later to crop/zoom.
+    if (pendingFotoPreview) {
+      URL.revokeObjectURL(pendingFotoPreview);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setPendingFotoFile(file);
+    setPendingFotoPreview(previewUrl);
+    setPreviewFailed(false);
+
+    // Also prepare the raw file for the editor in case the user opens it.
     if (rawFotoPreview) {
       URL.revokeObjectURL(rawFotoPreview);
     }
-    const previewUrl = URL.createObjectURL(file);
     setRawFotoFile(file);
-    setRawFotoPreview(previewUrl);
+    setRawFotoPreview(URL.createObjectURL(file));
     setFotoEditorZoom(1);
-    setFotoEditorOpen(true);
   };
 
   const handleSubmit = async (event) => {
@@ -654,8 +664,19 @@ export default function ModalMembro({
             </DialogTitle>
           </DialogHeader>
 
+          {/* File inputs live OUTSIDE the fieldset so they are never disabled by it */}
+          <input id="foto-upload" type="file" accept="image/*" onChange={handleFotoFileChange} className="hidden" />
+          <input
+            id="foto-camera"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFotoFileChange}
+            className="hidden"
+          />
+
           <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-6 px-6 pb-6">
-          <fieldset disabled={readOnly}>
+          {/* Photo section is outside the fieldset so admin can always upload */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label>Foto do Membro</Label>
@@ -699,15 +720,6 @@ export default function ModalMembro({
                   </div>
                 )}
                 <div className="flex-1">
-                  <input id="foto-upload" type="file" accept="image/*" onChange={handleFotoFileChange} className="hidden" />
-                  <input
-                    id="foto-camera"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFotoFileChange}
-                    className="hidden"
-                  />
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -727,6 +739,19 @@ export default function ModalMembro({
                       <Camera className="w-4 h-4 mr-2" />
                       {uploading ? 'Enviando...' : 'Usar Câmera'}
                     </Button>
+                    {pendingFotoFile && isAdmin && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setFotoEditorZoom(1);
+                          setFotoEditorOpen(true);
+                        }}
+                        disabled={uploading}
+                      >
+                        Editar Foto
+                      </Button>
+                    )}
                   </div>
                   <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG ou WEBP. Tamanho máximo: 5MB</p>
                   {!isAdmin && (
@@ -739,6 +764,9 @@ export default function ModalMembro({
                 </div>
               </div>
             </div>
+          </div>
+
+          <fieldset disabled={readOnly}><div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             <div className="md:col-span-2">
               <Label htmlFor="nome_completo">Nome Completo *</Label>
@@ -1453,7 +1481,7 @@ export default function ModalMembro({
           }
         }}
       >
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl" overlayClassName="z-[60]">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">Pré-visualizar e editar foto</DialogTitle>
           </DialogHeader>

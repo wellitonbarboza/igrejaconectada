@@ -1,10 +1,41 @@
--- Fix storage policies for photo upload.
--- The previous migration (20260607103000) conditionally applied policies only
--- when the migration runner was the owner of storage.objects, which often fails
--- in hosted Supabase environments.  This migration applies the policies
--- unconditionally so that photo uploads work correctly.
+-- Fix storage for photo upload.
+--
+-- IMPORTANT: Storage RLS policies (on storage.objects) cannot be created via
+-- the SQL Editor because the logged-in role is not the owner of that table.
+-- The policies below must be created through the Supabase Dashboard UI:
+--   Storage > Policies  (or Authentication > Policies > storage.objects)
+--
+-- Required policies (create manually in the Dashboard):
+--
+--   1. storage_public_read (SELECT)
+--      Target roles: public
+--      USING: bucket_id in ('fotos-membros','avatares','documentos')
+--
+--   2. storage_upload_authenticated (INSERT)
+--      Target roles: authenticated
+--      WITH CHECK: bucket_id = 'documentos'
+--
+--   3. storage_photo_upload_admin (INSERT)
+--      Target roles: authenticated
+--      WITH CHECK: bucket_id in ('fotos-membros','avatares')
+--                  and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+--
+--   4. storage_photo_update_admin (UPDATE)
+--      Target roles: authenticated
+--      USING + WITH CHECK: bucket_id in ('fotos-membros','avatares')
+--                          and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+--
+--   5. storage_photo_delete_admin (DELETE)
+--      Target roles: authenticated
+--      USING: bucket_id in ('fotos-membros','avatares')
+--             and exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+--
+-- However, the application code now uses the service_role key for photo bucket
+-- operations (after validating admin at the app level), so uploads will work
+-- even without these policies.  The policies are still recommended as
+-- defense-in-depth.
 
--- Ensure buckets exist and are public
+-- Ensure buckets exist and are public (this part works fine in the SQL Editor)
 insert into storage.buckets (id, name, public)
 values
   ('fotos-membros', 'fotos-membros', true),
@@ -12,76 +43,3 @@ values
   ('documentos', 'documentos', true)
 on conflict (id) do update
   set public = true;
-
--- Enable RLS on storage.objects
-alter table storage.objects enable row level security;
-
--- Drop old policies if they exist (idempotent)
-drop policy if exists "storage_public_read" on storage.objects;
-drop policy if exists "storage_upload_authenticated" on storage.objects;
-drop policy if exists "storage_photo_upload_admin" on storage.objects;
-drop policy if exists "storage_photo_update_admin" on storage.objects;
-drop policy if exists "storage_photo_delete_admin" on storage.objects;
-
--- Public read for all app buckets
-create policy "storage_public_read"
-on storage.objects
-for select
-using (
-  bucket_id in ('fotos-membros', 'avatares', 'documentos')
-);
-
--- Any authenticated user can upload to documentos
-create policy "storage_upload_authenticated"
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id = 'documentos'
-);
-
--- Admin-only insert for photo buckets
-create policy "storage_photo_upload_admin"
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-);
-
--- Admin-only update for photo buckets
-create policy "storage_photo_update_admin"
-on storage.objects
-for update
-to authenticated
-using (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-)
-with check (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-);
-
--- Admin-only delete for photo buckets
-create policy "storage_photo_delete_admin"
-on storage.objects
-for delete
-to authenticated
-using (
-  bucket_id in ('fotos-membros', 'avatares')
-  and exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'admin'
-  )
-);
