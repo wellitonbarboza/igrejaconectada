@@ -3,7 +3,7 @@ import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { compressImage } from '@/utils/imageCompression';
 import { resolveMemberPhotoUrl } from '@/utils/resolveMemberPhotoUrl';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { X, Upload, Camera, Mic, MicOff, Loader2, ShieldAlert } from 'lucide-react';
+import { X, Upload, Camera, Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -267,11 +267,6 @@ export default function ModalMembro({
     const file = event.target.files?.[0];
     event.target.value = '';
 
-    if (!isAdmin) {
-      setUploadError('Somente administradores podem fazer upload de fotos.');
-      return;
-    }
-
     if (!file) return;
     const validationError = validateFotoFile(file);
     if (validationError) {
@@ -282,7 +277,6 @@ export default function ModalMembro({
     setUploadError('');
 
     // Set the pending photo immediately so the preview shows right away.
-    // The user can optionally open the editor later to crop/zoom.
     if (pendingFotoPreview) {
       URL.revokeObjectURL(pendingFotoPreview);
     }
@@ -305,15 +299,11 @@ export default function ModalMembro({
     setUploadError('');
 
     const dataToSave = { ...formData };
-    if (!isAdmin && membro) {
-      dataToSave.foto_url = membro.foto_url || '';
-      dataToSave.foto_path = membro.foto_path || '';
-      dataToSave.foto_bucket = membro.foto_bucket || STORAGE_BUCKETS.fotosMembros;
-    }
     setUploading(true);
 
     try {
       if (!membro) {
+        // Creating new member: save without photo first, then upload photo
         const createdMembro = await saveMutation.mutateAsync({
           ...dataToSave,
           foto_url: '',
@@ -322,38 +312,45 @@ export default function ModalMembro({
         });
 
         const createdRecord = Array.isArray(createdMembro) ? createdMembro[0] : createdMembro;
-        if (isAdmin && pendingFotoFile && createdRecord?.id) {
-          const { file_url, filePath } = await uploadFotoFile(pendingFotoFile, createdRecord.id);
-          await base44.entities.Membro.update(createdRecord.id, {
-            foto_url: file_url,
-            foto_path: filePath,
-            foto_bucket: STORAGE_BUCKETS.fotosMembros,
-          });
+        if (pendingFotoFile && createdRecord?.id) {
+          try {
+            const { file_url, filePath } = await uploadFotoFile(pendingFotoFile, createdRecord.id);
+            await base44.entities.Membro.update(createdRecord.id, {
+              foto_url: file_url,
+              foto_path: filePath,
+              foto_bucket: STORAGE_BUCKETS.fotosMembros,
+            });
+          } catch (uploadErr) {
+            console.error('Erro no upload da foto (novo membro):', uploadErr);
+            setUploadError('Membro salvo, mas não foi possível enviar a foto: ' + (uploadErr?.message || 'Erro desconhecido'));
+          }
         }
       } else {
+        // Editing existing member
         let payload = dataToSave;
         const previousFotoPath = membro.foto_path;
         const previousFotoBucket = membro.foto_bucket || STORAGE_BUCKETS.fotosMembros;
 
-        if (isAdmin && pendingFotoFile) {
-          const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
-          payload = {
-            ...payload,
-            foto_url: file_url,
-            foto_path: filePath,
-            foto_bucket: STORAGE_BUCKETS.fotosMembros,
-          };
+        if (pendingFotoFile) {
+          try {
+            const { file_url, filePath } = await uploadFotoFile(pendingFotoFile);
+            payload = {
+              ...payload,
+              foto_url: file_url,
+              foto_path: filePath,
+              foto_bucket: STORAGE_BUCKETS.fotosMembros,
+            };
+          } catch (uploadErr) {
+            console.error('Erro no upload da foto (edição):', uploadErr);
+            setUploadError('Não foi possível enviar a foto: ' + (uploadErr?.message || 'Erro desconhecido'));
+            setUploading(false);
+            return;
+          }
         }
 
         await saveMutation.mutateAsync(payload);
 
-        const shouldDeleteOldPhoto =
-          isAdmin &&
-          pendingFotoFile &&
-          previousFotoPath &&
-          previousFotoPath !== payload.foto_path;
-
-        if (shouldDeleteOldPhoto) {
+        if (pendingFotoFile && previousFotoPath && previousFotoPath !== payload.foto_path) {
           try {
             await base44.integrations.Core.DeleteFile({
               bucket: previousFotoBucket,
@@ -692,27 +689,25 @@ export default function ModalMembro({
                         setUploadError('Não foi possível carregar a foto selecionada.');
                       }}
                     />
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (pendingFotoPreview) {
-                            URL.revokeObjectURL(pendingFotoPreview);
-                          }
-                          setPendingFotoFile(null);
-                          setPendingFotoPreview('');
-                          updateFormData((prev) => ({
-                            ...prev,
-                            foto_url: '',
-                            foto_path: '',
-                            foto_bucket: STORAGE_BUCKETS.fotosMembros,
-                          }));
-                        }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (pendingFotoPreview) {
+                          URL.revokeObjectURL(pendingFotoPreview);
+                        }
+                        setPendingFotoFile(null);
+                        setPendingFotoPreview('');
+                        updateFormData((prev) => ({
+                          ...prev,
+                          foto_url: '',
+                          foto_path: '',
+                          foto_bucket: STORAGE_BUCKETS.fotosMembros,
+                        }));
+                      }}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
@@ -725,7 +720,7 @@ export default function ModalMembro({
                       type="button"
                       variant="outline"
                       onClick={() => document.getElementById('foto-upload').click()}
-                      disabled={uploading || !isAdmin}
+                      disabled={uploading}
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       {uploading ? 'Enviando...' : 'Carregar Arquivo'}
@@ -734,12 +729,12 @@ export default function ModalMembro({
                       type="button"
                       variant="outline"
                       onClick={() => document.getElementById('foto-camera').click()}
-                      disabled={uploading || !isAdmin}
+                      disabled={uploading}
                     >
                       <Camera className="w-4 h-4 mr-2" />
                       {uploading ? 'Enviando...' : 'Usar Câmera'}
                     </Button>
-                    {pendingFotoFile && isAdmin && (
+                    {pendingFotoFile && (
                       <Button
                         type="button"
                         variant="outline"
@@ -754,12 +749,6 @@ export default function ModalMembro({
                     )}
                   </div>
                   <p className="text-sm text-slate-500 mt-2">Formatos aceitos: JPG, PNG ou WEBP. Tamanho máximo: 5MB</p>
-                  {!isAdmin && (
-                    <p className="text-xs text-amber-700 mt-2 inline-flex items-center gap-1">
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      Somente administradores podem salvar foto de membro.
-                    </p>
-                  )}
                   {uploadError && <p className="text-sm text-red-600 mt-1">{uploadError}</p>}
                 </div>
               </div>
