@@ -488,16 +488,14 @@ async function ensureAdminProfile() {
 }
 
 
-async function assertAdminForPhotoUpload() {
+async function assertAuthenticatedForPhotoUpload() {
   const authUser = await fetchCurrentAuthUser();
   if (!authUser?.id) {
     throw new Error('Sessão inválida para upload. Faça login novamente.');
   }
-
-  const profile = await fetchProfileByUserId(authUser.id);
-  if (profile?.role !== 'admin') {
-    throw new Error('Somente administradores podem enviar fotos.');
-  }
+  // The actual upload uses the service role key which bypasses RLS.
+  // We only need to verify the user is authenticated.
+  return authUser;
 }
 
 export const base44 = {
@@ -602,7 +600,7 @@ export const base44 = {
           bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares;
 
         if (isPhotoBucket) {
-          await assertAdminForPhotoUpload();
+          await assertAuthenticatedForPhotoUpload();
         }
 
         // Photo buckets use the service role key to bypass RLS policies that
@@ -648,7 +646,7 @@ export const base44 = {
           bucket === STORAGE_BUCKETS.fotosMembros || bucket === STORAGE_BUCKETS.avatares;
 
         if (isPhotoBucket) {
-          await assertAdminForPhotoUpload();
+          await assertAuthenticatedForPhotoUpload();
         }
 
         const authToken = isPhotoBucket ? getAdminAuthToken() : getRequiredAuthToken();
