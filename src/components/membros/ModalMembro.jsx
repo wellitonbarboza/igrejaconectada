@@ -35,6 +35,8 @@ export default function ModalMembro({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const pendingFotoFileRef = useRef(null);
+  // Guarda o membro recém-criado nesta sessão para evitar duplicatas em retry
+  const createdMembroRef = useRef(null);
   const [recordingField, setRecordingField] = useState(null);
   const [cepStatus, setCepStatus] = useState({ loading: false, error: '' });
   const recognitionRef = useRef(null);
@@ -229,10 +231,13 @@ export default function ModalMembro({
     const dataToSave = { ...formData };
     const pendingFile = pendingFotoFileRef.current;
 
+    // Usa o membro da prop (edição) ou o membro recém-criado nesta sessão (retry após falha de foto)
+    const membroAtual = membro || createdMembroRef.current;
+
     try {
-      if (!membro) {
+      if (!membroAtual) {
         // --- NOVO MEMBRO ---
-        // 1. Salva o membro sem foto
+        // 1. Salva o membro sem foto primeiro
         const createdMembro = await saveMutation.mutateAsync({
           ...dataToSave,
           foto_url: '',
@@ -242,8 +247,15 @@ export default function ModalMembro({
 
         const createdRecord = Array.isArray(createdMembro) ? createdMembro[0] : createdMembro;
 
+        if (!createdRecord?.id) {
+          throw new Error('Não foi possível obter o ID do membro criado.');
+        }
+
+        // Guarda referência para evitar duplicata em caso de retry
+        createdMembroRef.current = createdRecord;
+
         // 2. Faz upload da foto se tiver uma selecionada
-        if (pendingFile && createdRecord?.id) {
+        if (pendingFile) {
           try {
             const result = await uploadMemberPhoto(pendingFile, createdRecord.id);
             if (result) {
@@ -255,20 +267,25 @@ export default function ModalMembro({
             }
           } catch (uploadErr) {
             console.error('[FotoUpload] Erro no upload (novo membro):', uploadErr);
-            // Membro foi salvo, mas foto falhou - não impede o fluxo
-            setUploadError('Membro salvo, mas a foto não foi enviada: ' + (uploadErr?.message || ''));
+            // Mantém modal aberto para o usuário ver o erro — membro já foi salvo
+            setUploadError(
+              'Membro salvo, mas a foto não pôde ser enviada: ' +
+              (uploadErr?.message || 'Tente novamente ou feche para continuar sem foto.')
+            );
+            setUploading(false);
+            return; // não fecha o modal
           }
         }
       } else {
-        // --- EDITANDO MEMBRO ---
+        // --- EDITANDO MEMBRO (inclui retry de foto após falha na criação) ---
         let payload = dataToSave;
-        const previousFotoPath = membro.foto_path;
-        const previousFotoBucket = membro.foto_bucket || STORAGE_BUCKETS.fotosMembros;
+        const previousFotoPath = membroAtual.foto_path;
+        const previousFotoBucket = membroAtual.foto_bucket || STORAGE_BUCKETS.fotosMembros;
 
         // 1. Upload da nova foto se tiver
         if (pendingFile) {
           try {
-            const result = await uploadMemberPhoto(pendingFile, membro.id);
+            const result = await uploadMemberPhoto(pendingFile, membroAtual.id);
             if (result) {
               payload = {
                 ...payload,
@@ -279,14 +296,23 @@ export default function ModalMembro({
             }
           } catch (uploadErr) {
             console.error('[FotoUpload] Erro no upload (edição):', uploadErr);
-            setUploadError('Não foi possível enviar a foto: ' + (uploadErr?.message || ''));
+            setUploadError('Não foi possível enviar a foto: ' + (uploadErr?.message || 'Tente novamente.'));
             setUploading(false);
             return;
           }
         }
 
-        // 2. Salva o membro
-        await saveMutation.mutateAsync(payload);
+        // 2. Salva os dados do membro (só faz update se não for retry de foto em membro recém-criado)
+        if (membro || !createdMembroRef.current) {
+          await saveMutation.mutateAsync(payload);
+        } else {
+          // Retry de foto: o membro já foi criado, apenas atualiza os campos de foto
+          await base44.entities.Membro.update(membroAtual.id, {
+            foto_url: payload.foto_url,
+            foto_path: payload.foto_path,
+            foto_bucket: payload.foto_bucket || STORAGE_BUCKETS.fotosMembros,
+          });
+        }
 
         // 3. Remove foto antiga se trocou
         if (pendingFile && previousFotoPath && previousFotoPath !== payload.foto_path) {
@@ -305,6 +331,7 @@ export default function ModalMembro({
         window.localStorage.removeItem(DRAFT_KEY);
       }
       pendingFotoFileRef.current = null;
+      createdMembroRef.current = null;
       queryClient.invalidateQueries({ queryKey: ['membros'] });
       queryClient.invalidateQueries({ queryKey: ['membro'] });
       onClose();
