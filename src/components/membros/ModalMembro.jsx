@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
