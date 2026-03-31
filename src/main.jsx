@@ -9,7 +9,14 @@ const queryClient = new QueryClient();
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js');
+    // Unregister any old service workers that had a broken fetch handler,
+    // then re-register the clean version.
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      const unregisterPromises = registrations.map((r) => r.unregister());
+      return Promise.all(unregisterPromises);
+    }).then(() => {
+      navigator.serviceWorker.register('/sw.js');
+    });
   });
 }
 
