@@ -18,6 +18,8 @@ const ChurchContext = createContext({
   modulosAtivos: [],
   isSuperAdmin: false,
   loading: true,
+  config: null,
+  configsPorIgreja: {},
   setIgrejaAtivaId: () => {},
   refresh: async () => {},
 });
@@ -32,6 +34,7 @@ export function ChurchProvider({ children }) {
   const { user } = useAuth();
   const [igrejas, setIgrejas] = useState([]);
   const [modulos, setModulos] = useState([]);
+  const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [igrejaAtivaId, setIgrejaAtivaIdState] = useState(() => {
     if (typeof window === 'undefined') return null;
@@ -52,21 +55,25 @@ export function ChurchProvider({ children }) {
     if (!user) {
       setIgrejas([]);
       setModulos([]);
+      setConfigs([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const [listaIgrejas, listaModulos] = await Promise.all([
+      const [listaIgrejas, listaModulos, listaConfigs] = await Promise.all([
         base44.entities.Igreja.list('nome').catch(() => []),
         base44.entities.IgrejaModulo.list().catch(() => []),
+        base44.entities.Config.list().catch(() => []),
       ]);
       setIgrejas(Array.isArray(listaIgrejas) ? listaIgrejas : []);
       setModulos(Array.isArray(listaModulos) ? listaModulos : []);
+      setConfigs(Array.isArray(listaConfigs) ? listaConfigs : []);
     } catch (error) {
       console.warn('Falha ao carregar igrejas/módulos', error);
       setIgrejas([]);
       setModulos([]);
+      setConfigs([]);
     } finally {
       setLoading(false);
     }
@@ -98,6 +105,26 @@ export function ChurchProvider({ children }) {
       .map((m) => m.modulo);
   }, [modulos, igrejaAtiva, superAdmin]);
 
+  // Config (logo, dados de contato etc.) da igreja ativa.
+  // Mantém compatibilidade com bases legadas onde ainda não existe `igreja_id`
+  // em `configs` (retorna o primeiro registro como fallback).
+  const config = useMemo(() => {
+    if (!configs || configs.length === 0) return null;
+    if (igrejaAtiva) {
+      const byIgreja = configs.find((c) => c.igreja_id === igrejaAtiva.id);
+      if (byIgreja) return byIgreja;
+    }
+    return configs.find((c) => !c.igreja_id) || configs[0] || null;
+  }, [configs, igrejaAtiva]);
+
+  const configsPorIgreja = useMemo(() => {
+    const map = {};
+    (configs || []).forEach((c) => {
+      if (c.igreja_id) map[c.igreja_id] = c;
+    });
+    return map;
+  }, [configs]);
+
   const value = useMemo(
     () => ({
       igrejas,
@@ -105,10 +132,12 @@ export function ChurchProvider({ children }) {
       modulosAtivos,
       isSuperAdmin: superAdmin,
       loading,
+      config,
+      configsPorIgreja,
       setIgrejaAtivaId,
       refresh,
     }),
-    [igrejas, igrejaAtiva, modulosAtivos, superAdmin, loading]
+    [igrejas, igrejaAtiva, modulosAtivos, superAdmin, loading, config, configsPorIgreja]
   );
 
   return <ChurchContext.Provider value={value}>{children}</ChurchContext.Provider>;

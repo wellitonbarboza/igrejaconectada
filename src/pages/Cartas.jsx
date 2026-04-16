@@ -17,12 +17,14 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
-import ieadLogo from '@/assets/iead-logo.svg';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
+import ChurchLogo from '@/components/ChurchLogo.jsx';
 import usePermissions from '@/hooks/usePermissions';
+import { useChurch } from '@/context/ChurchContext.jsx';
 
 export default function Cartas() {
   const { user } = useAuth();
+  const { config } = useChurch();
   const queryClient = useQueryClient();
   const [tipoCarta, setTipoCarta] = useState('recomendacao');
   const [membroSelecionado, setMembroSelecionado] = useState(null);
@@ -45,12 +47,6 @@ export default function Cartas() {
   const { data: membros = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
-    initialData: [],
-  });
-
-  const { data: configs = [] } = useQuery({
-    queryKey: ['configs'],
-    queryFn: () => base44.entities.Config.list(),
     initialData: [],
   });
 
@@ -85,8 +81,6 @@ export default function Cartas() {
       queryClient.invalidateQueries({ queryKey: ['cartas-emitidas'] });
     },
   });
-
-  const config = configs[0];
 
   const filteredMembros = membros.filter(
     (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -433,9 +427,8 @@ export default function Cartas() {
     return (
       <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border flex flex-col">
         <div className="text-center mb-7 pb-4 border-b border-slate-300">
-          <img
-            src={config.logo_url || ieadLogo}
-            alt="Logo"
+          <ChurchLogo
+            alt={`Logo ${config.nome_igreja || 'Igreja'}`}
             className="h-16 mx-auto mb-3"
           />
           <h1 className="text-2xl font-bold text-slate-900 mb-1">{config.nome_igreja}</h1>

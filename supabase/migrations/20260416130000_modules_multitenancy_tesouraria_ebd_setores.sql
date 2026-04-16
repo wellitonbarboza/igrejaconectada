@@ -222,7 +222,7 @@ update public.profiles
  where lower(email) = lower('welliton.tec@hotmail.com');
 
 -- =====================================================================
--- 7. Igreja "Padrão" para dados legados (caso já existam membros)
+-- 7. Igreja padrão para dados legados (Assembleia de Deus Santa Tereza do Oeste)
 -- =====================================================================
 do $$
 declare
@@ -230,7 +230,7 @@ declare
 begin
   if not exists (select 1 from public.igrejas) then
     insert into public.igrejas (nome, cidade, estado, ativa)
-    values ('Igreja Principal', null, null, true)
+    values ('Assembleia de Deus Santa Tereza do Oeste', 'Santa Tereza do Oeste', 'PR', true)
     returning id into igreja_padrao_id;
 
     -- Habilita todos os módulos por padrão

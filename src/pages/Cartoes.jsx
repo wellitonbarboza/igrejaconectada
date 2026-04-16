@@ -10,11 +10,14 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
-import ieadLogo from '@/assets/iead-logo.svg';
+import ChurchLogo from '@/components/ChurchLogo.jsx';
+import { useChurch } from '@/context/ChurchContext.jsx';
 
 
 export default function Cartoes() {
   const { user } = useAuth();
+  const { config, igrejaAtiva } = useChurch();
+  const nomeIgreja = config?.nome_igreja || igrejaAtiva?.nome || 'Igreja Digital';
   const [searchTerm, setSearchTerm] = useState('');
   const [membrosSelecionados, setMembrosSelecionados] = useState([]);
   const cartoesPreviewRef = useRef(null);
@@ -67,9 +70,9 @@ export default function Cartoes() {
 
       <div className="relative z-10 h-full flex flex-col">
         <div className="flex items-center gap-2 mb-4">
-          <img src={ieadLogo} alt="Ícone da Igreja Digital" className="w-6 h-6" />
+          <ChurchLogo className="w-6 h-6 rounded bg-white p-0.5" alt={`Logo ${nomeIgreja}`} />
           <div>
-            <p className="font-bold text-lg">Igreja Digital</p>
+            <p className="font-bold text-lg truncate max-w-[260px]">{nomeIgreja}</p>
             <p className="text-xs opacity-80">Cartão de Membro</p>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { ArrowLeft, Download as DownloadIcon, ExternalLink, Monitor, Smartphone 
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ieadLogo from '@/assets/iead-logo.svg';
+import appLogo from '@/assets/church-logo.svg';
 
 const netlifyBaseUrl =
   import.meta.env.VITE_NETLIFY_BASE_URL ||
@@ -58,7 +58,7 @@ export default function Download() {
           <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-indigo-50">
             <CardTitle className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-white border border-indigo-100 flex items-center justify-center shadow-sm">
-                <img src={ieadLogo} alt="Logo IEAD" className="w-8 h-8" />
+                <img src={appLogo} alt="Logo Igreja Conectada" className="w-8 h-8" />
               </div>
               <div>
                 <p className="text-sm font-medium text-slate-500">Baixar app para</p>

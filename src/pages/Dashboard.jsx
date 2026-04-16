@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
 import usePermissions from '@/hooks/usePermissions';
-import ieadLogo from '@/assets/iead-logo.svg';
+import appLogo from '@/assets/church-logo.svg';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -310,7 +310,7 @@ export default function Dashboard() {
                   onClick={handleInstallClick}
                   type="button"
                 >
-                  <img src={ieadLogo} alt="Logo IEAD" className="w-4 h-4 mr-2" />
+                  <img src={appLogo} alt="Logo Igreja Conectada" className="w-4 h-4 mr-2" />
                   Instalar como app
                 </Button>
               )}

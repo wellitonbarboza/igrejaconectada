@@ -34,7 +34,7 @@ import {
   SlidersHorizontal,
   UserCog,
 } from 'lucide-react';
-import ieadLogo from '@/assets/iead-logo.svg';
+import ChurchLogo from '@/components/ChurchLogo.jsx';
 import {
   Sidebar,
   SidebarContent,
@@ -151,11 +151,11 @@ export default function Layout({ children }) {
         <Sidebar className="border-r border-slate-200 bg-white">
           <SidebarHeader className="border-b border-slate-200 p-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-white border border-blue-100">
-                <img src={ieadLogo} alt="Ícone da Igreja Digital" className="w-8 h-8" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-white border border-blue-100 overflow-hidden">
+                <ChurchLogo alt={igrejaAtiva?.nome ? `Logo ${igrejaAtiva.nome}` : 'Logo Igreja Digital'} className="w-8 h-8 object-contain" />
               </div>
               <div>
-                <h2 className="font-bold text-slate-900 text-lg">Igreja Digital</h2>
+                <h2 className="font-bold text-slate-900 text-lg truncate max-w-[180px]">{igrejaAtiva?.nome || 'Igreja Digital'}</h2>
                 <p className="text-xs text-slate-500">Sistema de Gestão</p>
               </div>
             </div>
@@ -281,8 +281,8 @@ export default function Layout({ children }) {
                 <Menu className="w-5 h-5" />
               </SidebarTrigger>
               <div className="flex items-center gap-2">
-                <img src={ieadLogo} alt="Ícone da Igreja Digital" className="w-6 h-6" />
-                <h1 className="text-lg font-bold text-slate-900">Igreja Digital</h1>
+                <ChurchLogo alt={igrejaAtiva?.nome ? `Logo ${igrejaAtiva.nome}` : 'Logo Igreja Digital'} className="w-6 h-6 object-contain" />
+                <h1 className="text-lg font-bold text-slate-900 truncate max-w-[220px]">{igrejaAtiva?.nome || 'Igreja Digital'}</h1>
               </div>
             </div>
           </header>
