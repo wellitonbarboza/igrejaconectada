@@ -16,6 +16,16 @@ import Cartas from '@/pages/Cartas.jsx';
 import UsuariosAdmin from '@/pages/UsuariosAdmin.jsx';
 import Download from '@/pages/Download.jsx';
 import ArquivoMorto from '@/pages/ArquivoMorto.jsx';
+import AdminIgrejas from '@/pages/AdminIgrejas.jsx';
+import AdminModulos from '@/pages/AdminModulos.jsx';
+import TesourariaLancamentos from '@/pages/TesourariaLancamentos.jsx';
+import TesourariaFluxoCaixa from '@/pages/TesourariaFluxoCaixa.jsx';
+import TesourariaRelatorios from '@/pages/TesourariaRelatorios.jsx';
+import EbdClasses from '@/pages/EbdClasses.jsx';
+import EbdAulas from '@/pages/EbdAulas.jsx';
+import EbdCaixa from '@/pages/EbdCaixa.jsx';
+import EbdRelatorios from '@/pages/EbdRelatorios.jsx';
+import PresencaSetores from '@/pages/PresencaSetores.jsx';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { hasPageAccess } from '@/utils/accessControl';
@@ -89,6 +99,16 @@ export default function App() {
         <Route path={createPageUrl('Configuracoes')} element={<ProtectedRoute page="Configuracoes"><Configuracoes /></ProtectedRoute>} />
         <Route path={createPageUrl('Cartas')} element={<ProtectedRoute page="Cartas"><Cartas /></ProtectedRoute>} />
         <Route path={createPageUrl('Usuarios')} element={<ProtectedRoute page="Usuarios"><UsuariosAdmin /></ProtectedRoute>} />
+        <Route path={createPageUrl('AdminIgrejas')} element={<ProtectedRoute page="AdminIgrejas"><AdminIgrejas /></ProtectedRoute>} />
+        <Route path={createPageUrl('AdminModulos')} element={<ProtectedRoute page="AdminModulos"><AdminModulos /></ProtectedRoute>} />
+        <Route path={createPageUrl('TesourariaLancamentos')} element={<ProtectedRoute page="TesourariaLancamentos"><TesourariaLancamentos /></ProtectedRoute>} />
+        <Route path={createPageUrl('TesourariaFluxoCaixa')} element={<ProtectedRoute page="TesourariaFluxoCaixa"><TesourariaFluxoCaixa /></ProtectedRoute>} />
+        <Route path={createPageUrl('TesourariaRelatorios')} element={<ProtectedRoute page="TesourariaRelatorios"><TesourariaRelatorios /></ProtectedRoute>} />
+        <Route path={createPageUrl('EbdClasses')} element={<ProtectedRoute page="EbdClasses"><EbdClasses /></ProtectedRoute>} />
+        <Route path={createPageUrl('EbdAulas')} element={<ProtectedRoute page="EbdAulas"><EbdAulas /></ProtectedRoute>} />
+        <Route path={createPageUrl('EbdCaixa')} element={<ProtectedRoute page="EbdCaixa"><EbdCaixa /></ProtectedRoute>} />
+        <Route path={createPageUrl('EbdRelatorios')} element={<ProtectedRoute page="EbdRelatorios"><EbdRelatorios /></ProtectedRoute>} />
+        <Route path={createPageUrl('PresencaSetores')} element={<ProtectedRoute page="PresencaSetores"><PresencaSetores /></ProtectedRoute>} />
         <Route path={createPageUrl('Download')} element={<Navigate to={`${createPageUrl('Download')}/mobile`} replace />} />
         <Route path={`${createPageUrl('Download')}/:platform`} element={<ProtectedRoute page="Download"><Download /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={createPageUrl('Dashboard')} replace />} />

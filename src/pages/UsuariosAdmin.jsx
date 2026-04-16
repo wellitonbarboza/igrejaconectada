@@ -19,6 +19,7 @@ import {
   ACTION_LABELS,
   getResolvedPermissions,
 } from '@/utils/accessControl';
+import { useChurch } from '@/context/ChurchContext.jsx';
 
 const SUPER_ADMIN_EMAIL = 'welliton.tec@hotmail.com';
 
@@ -39,11 +40,17 @@ const defaultNovoUsuario = {
 
 export default function UsuariosAdmin() {
   const { user } = useAuth();
+  const { igrejas, isSuperAdmin } = useChurch();
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [novoUsuario, setNovoUsuario] = useState(defaultNovoUsuario);
   const [permissionsTarget, setPermissionsTarget] = useState(null);
   const [editingPermissions, setEditingPermissions] = useState({});
+
+  const updateIgrejaMutation = useMutation({
+    mutationFn: ({ id, igreja_id }) => base44.entities.Perfil.update(id, { igreja_id: igreja_id || null }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['usuarios'] }),
+  });
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ['usuarios'],
@@ -317,6 +324,7 @@ export default function UsuariosAdmin() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Cargo</TableHead>
+                    {isSuperAdmin && <TableHead>Igreja</TableHead>}
                     <TableHead>Nível</TableHead>
                     <TableHead>Permissões</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -342,6 +350,24 @@ export default function UsuariosAdmin() {
                           onBlur={(event) => handleChangeCargo(usuario, event.target.value)}
                         />
                       </TableCell>
+                      {isSuperAdmin && (
+                        <TableCell>
+                          <Select
+                            value={usuario.igreja_id || ''}
+                            onValueChange={(value) => updateIgrejaMutation.mutate({ id: usuario.id, igreja_id: value || null })}
+                          >
+                            <SelectTrigger className="w-[180px]">
+                              <SelectValue placeholder="Sem igreja" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Sem igreja</SelectItem>
+                              {igrejas.map((igreja) => (
+                                <SelectItem key={igreja.id} value={igreja.id}>{igreja.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Select value={usuario.role || 'usuario'} onValueChange={(value) => handleChangeRole(usuario, value)} disabled={(usuario.email || '').toLowerCase() === SUPER_ADMIN_EMAIL}>
                           <SelectTrigger className="w-[180px]">
