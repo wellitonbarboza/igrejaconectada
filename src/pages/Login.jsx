@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/context/AuthContext.jsx';
-import ieadLogo from '@/assets/iead-logo.svg';
+import appLogo from '@/assets/church-logo.svg';
 
 export default function Login() {
   const { user, signIn } = useAuth();
@@ -45,11 +45,11 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-white border border-blue-100 shadow flex items-center justify-center">
-            <img src={ieadLogo} alt="Logo Igreja Digital" className="w-12 h-12" />
+          <div className="mx-auto w-20 h-20 rounded-2xl bg-white border border-blue-100 shadow-lg flex items-center justify-center overflow-hidden">
+            <img src={appLogo} alt="Logo Igreja Conectada" className="w-16 h-16" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Entrar no sistema</CardTitle>
-          <p className="text-sm text-slate-500">Use seu e-mail e senha para acessar.</p>
+          <CardTitle className="text-2xl font-bold text-slate-900">Igreja Conectada</CardTitle>
+          <p className="text-sm text-slate-500">Entre com seu e-mail e senha para acessar o sistema.</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

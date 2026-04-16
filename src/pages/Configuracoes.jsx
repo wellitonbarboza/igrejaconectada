@@ -10,12 +10,28 @@ import { Textarea } from '@/components/ui/textarea';
 import { compressImage } from '@/utils/imageCompression';
 import ieadLogo from '@/assets/iead-logo.svg';
 import usePermissions from '@/hooks/usePermissions';
+import { useChurch } from '@/context/ChurchContext.jsx';
 
+const DEFAULT_FORM = {
+  nome_igreja: '',
+  endereco_completo: '',
+  cidade: '',
+  estado: '',
+  cep: '',
+  telefone: '',
+  email: '',
+  cnpj: '',
+  pastor_presidente: '',
+  logo_url: '',
+  logo_path: '',
+  logo_bucket: '',
+};
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const perms = usePermissions('Configuracoes');
+  const { igrejaAtiva, refresh: refreshChurchContext } = useChurch();
 
   const { data: configs = [] } = useQuery({
     queryKey: ['configs'],
@@ -23,26 +39,36 @@ export default function Configuracoes() {
     initialData: [],
   });
 
-  const config = configs[0];
+  // Resolve o registro de config pertencente à igreja ativa. Mantém fallback
+  // para bases antigas que ainda não têm `igreja_id` em configs.
+  const config = React.useMemo(() => {
+    if (!Array.isArray(configs) || configs.length === 0) return null;
+    if (igrejaAtiva) {
+      const porIgreja = configs.find((c) => c.igreja_id === igrejaAtiva.id);
+      if (porIgreja) return porIgreja;
+    }
+    return configs.find((c) => !c.igreja_id) || null;
+  }, [configs, igrejaAtiva]);
 
-  const [formData, setFormData] = useState({
-    nome_igreja: '',
-    endereco_completo: '',
-    cidade: '',
-    estado: '',
-    cep: '',
-    telefone: '',
-    email: '',
-    cnpj: '',
-    pastor_presidente: '',
-    logo_url: '',
-  });
+  const [formData, setFormData] = useState(DEFAULT_FORM);
 
   useEffect(() => {
+    // Sempre que a igreja ativa mudar ou o config carregar, hidrata o form.
     if (config) {
-      setFormData((prev) => ({ ...prev, ...config }));
+      setFormData({
+        ...DEFAULT_FORM,
+        ...config,
+        nome_igreja: config.nome_igreja || igrejaAtiva?.nome || '',
+      });
+    } else {
+      setFormData({
+        ...DEFAULT_FORM,
+        nome_igreja: igrejaAtiva?.nome || '',
+        cidade: igrejaAtiva?.cidade || '',
+        estado: igrejaAtiva?.estado || '',
+      });
     }
-  }, [config]);
+  }, [config, igrejaAtiva?.id, igrejaAtiva?.nome, igrejaAtiva?.cidade, igrejaAtiva?.estado]);
 
   const normalizeConfigPayload = (data) => {
     const optionalFields = [
@@ -55,29 +81,35 @@ export default function Configuracoes() {
       'cnpj',
       'pastor_presidente',
       'logo_url',
+      'logo_path',
+      'logo_bucket',
     ];
     const payload = { ...data };
-
     optionalFields.forEach((field) => {
-      if (payload[field] === '') {
-        payload[field] = null;
-      }
+      if (payload[field] === '') payload[field] = null;
     });
-
     return payload;
   };
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const normalizedData = normalizeConfigPayload(data);
-      if (config) {
+      const normalizedData = normalizeConfigPayload({
+        ...data,
+        igreja_id: igrejaAtiva?.id || null,
+      });
+      if (config?.id) {
         return base44.entities.Config.update(config.id, normalizedData);
       }
       return base44.entities.Config.create(normalizedData);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['configs'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['configs'] });
+      // Atualiza ChurchContext para novas logos/refs refletirem imediatamente
+      if (typeof refreshChurchContext === 'function') {
+        refreshChurchContext();
+      }
     },
+    onError: (err) => alert('Erro ao salvar configurações: ' + (err?.message || '')),
   });
 
   const handleSubmit = (e) => {
@@ -96,18 +128,29 @@ export default function Configuracoes() {
     setUploading(true);
     try {
       const compressedFile = await compressImage(file, { maxSize: 1000, quality: 0.85 });
-      const { file_url } = await base44.integrations.Core.UploadFile({
+      const igrejaSlug = igrejaAtiva?.id ? `igreja-${igrejaAtiva.id}` : 'global';
+      const extension = (file.name?.split('.').pop() || 'png').toLowerCase();
+      const path = `logos/${igrejaSlug}/${Date.now()}.${extension}`;
+      const { file_url, path: storedPath } = await base44.integrations.Core.UploadFile({
         file: compressedFile,
         bucket: STORAGE_BUCKETS.avatares,
+        path,
       });
-      handleChange('logo_url', file_url);
+      setFormData((prev) => ({
+        ...prev,
+        logo_url: file_url,
+        logo_path: storedPath,
+        logo_bucket: STORAGE_BUCKETS.avatares,
+      }));
     } catch (error) {
       console.error('Erro ao fazer upload da logo:', error);
+      alert('Erro ao enviar a logo: ' + (error?.message || ''));
     }
     setUploading(false);
   };
 
   const previewLogo = formData.logo_url || ieadLogo;
+  const sugestaoNome = igrejaAtiva?.nome ? `Ex.: ${igrejaAtiva.nome}` : 'Ex.: Igreja Evangélica Assembleia de Deus';
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
@@ -118,166 +161,172 @@ export default function Configuracoes() {
             Configurações da Igreja
           </h1>
           <p className="text-slate-500 mt-1">
-            Configure as informações da sua igreja que serão usadas em cartas, relatórios e cartões
+            {igrejaAtiva
+              ? <>Configurações específicas da <strong>{igrejaAtiva.nome}</strong>. Cada igreja cadastrada tem suas próprias informações, contatos e logo.</>
+              : 'Configure as informações da sua igreja que serão usadas em cartas, relatórios e cartões.'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <fieldset disabled={!perms.canEdit}>
-          {!perms.canEdit && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-              <p className="text-sm text-amber-800">
-                Você tem permissão apenas para visualizar as configurações. Entre em contato com um administrador para alterações.
-              </p>
-            </div>
-          )}
-          <Card className="shadow-lg border-0">
-            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
-              <CardTitle className="flex items-center gap-2">
-                <Church className="w-5 h-5" />
-                Informações Básicas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <Label htmlFor="nome_igreja">Nome da Igreja *</Label>
-                  <Input
-                    id="nome_igreja"
-                    value={formData.nome_igreja}
-                    onChange={(e) => handleChange('nome_igreja', e.target.value)}
-                    placeholder="Ex: Igreja Evangélica Assembleia de Deus"
-                    required
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="endereco_completo">Endereço Completo</Label>
-                  <Textarea
-                    id="endereco_completo"
-                    value={formData.endereco_completo}
-                    onChange={(e) => handleChange('endereco_completo', e.target.value)}
-                    placeholder="Rua, número, bairro, complemento"
-                    rows={2}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="cidade">Cidade</Label>
-                  <Input id="cidade" value={formData.cidade} onChange={(e) => handleChange('cidade', e.target.value)} />
-                </div>
-
-                <div>
-                  <Label htmlFor="estado">Estado</Label>
-                  <Input
-                    id="estado"
-                    value={formData.estado}
-                    onChange={(e) => handleChange('estado', e.target.value)}
-                    placeholder="UF"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="cep">CEP</Label>
-                  <Input
-                    id="cep"
-                    value={formData.cep}
-                    onChange={(e) => handleChange('cep', e.target.value)}
-                    placeholder="00000-000"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={formData.telefone}
-                    onChange={(e) => handleChange('telefone', e.target.value)}
-                    placeholder="(00) 0000-0000"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input
-                    id="cnpj"
-                    value={formData.cnpj}
-                    onChange={(e) => handleChange('cnpj', e.target.value)}
-                    placeholder="00.000.000/0000-00"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label htmlFor="pastor_presidente">Pastor Presidente</Label>
-                  <Input
-                    id="pastor_presidente"
-                    value={formData.pastor_presidente}
-                    onChange={(e) => handleChange('pastor_presidente', e.target.value)}
-                    placeholder="Nome do pastor presidente"
-                  />
-                </div>
+            {!perms.canEdit && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm text-amber-800">
+                  Você tem permissão apenas para visualizar as configurações. Entre em contato com um administrador para alterações.
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            )}
 
-          <Card className="shadow-lg border-0">
-            <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
-              <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="w-5 h-5" />
-                Logo da Igreja
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div className="flex justify-center">
-                  <img src={previewLogo} alt="Logo da Igreja" className="max-h-48 rounded-lg shadow-md" />
-                </div>
-
-                <div>
-                  <Label htmlFor="logo">Upload da Logo</Label>
-                  <div className="mt-2">
-                    <input id="logo" type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('logo').click()}
-                      disabled={uploading}
-                      className="w-full"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      {uploading ? 'Enviando...' : 'Escolher Imagem'}
-                    </Button>
+            <Card className="shadow-lg border-0">
+              <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
+                <CardTitle className="flex items-center gap-2">
+                  <Church className="w-5 h-5" />
+                  Informações Básicas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="nome_igreja">Nome da Igreja *</Label>
+                    <Input
+                      id="nome_igreja"
+                      value={formData.nome_igreja}
+                      onChange={(e) => handleChange('nome_igreja', e.target.value)}
+                      placeholder={sugestaoNome}
+                      required
+                    />
                   </div>
-                  <p className="text-sm text-slate-500 mt-2">
-                    Formatos aceitos: PNG, JPG, SVG. Tamanho recomendado: 400x400px
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {perms.canEdit && (
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                className="bg-gradient-to-r from-blue-500 to-purple-600"
-                disabled={saveMutation.isPending}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {saveMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
-              </Button>
-            </div>
-          )}
+                  <div className="md:col-span-2">
+                    <Label htmlFor="endereco_completo">Endereço Completo</Label>
+                    <Textarea
+                      id="endereco_completo"
+                      value={formData.endereco_completo}
+                      onChange={(e) => handleChange('endereco_completo', e.target.value)}
+                      placeholder="Rua, número, bairro, complemento"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cidade">Cidade</Label>
+                    <Input id="cidade" value={formData.cidade} onChange={(e) => handleChange('cidade', e.target.value)} />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="estado">Estado</Label>
+                    <Input
+                      id="estado"
+                      value={formData.estado}
+                      onChange={(e) => handleChange('estado', e.target.value)}
+                      placeholder="UF"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cep">CEP</Label>
+                    <Input
+                      id="cep"
+                      value={formData.cep}
+                      onChange={(e) => handleChange('cep', e.target.value)}
+                      placeholder="00000-000"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <Input
+                      id="telefone"
+                      value={formData.telefone}
+                      onChange={(e) => handleChange('telefone', e.target.value)}
+                      placeholder="(00) 0000-0000"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cnpj">CNPJ</Label>
+                    <Input
+                      id="cnpj"
+                      value={formData.cnpj}
+                      onChange={(e) => handleChange('cnpj', e.target.value)}
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label htmlFor="pastor_presidente">Pastor Presidente</Label>
+                    <Input
+                      id="pastor_presidente"
+                      value={formData.pastor_presidente}
+                      onChange={(e) => handleChange('pastor_presidente', e.target.value)}
+                      placeholder="Nome do pastor presidente"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-lg border-0">
+              <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
+                <CardTitle className="flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5" />
+                  Logo da Igreja
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-center">
+                    <img src={previewLogo} alt="Logo da Igreja" className="max-h-48 rounded-lg shadow-md bg-white p-2" />
+                  </div>
+                  <p className="text-xs text-slate-500 text-center">
+                    Esta logo será usada nos cartões de membro, cartas, cabeçalho do sistema e relatórios.
+                  </p>
+
+                  <div>
+                    <Label htmlFor="logo">Upload da Logo</Label>
+                    <div className="mt-2">
+                      <input id="logo" type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('logo').click()}
+                        disabled={uploading}
+                        className="w-full"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {uploading ? 'Enviando...' : 'Escolher Imagem'}
+                      </Button>
+                    </div>
+                    <p className="text-sm text-slate-500 mt-2">
+                      Formatos aceitos: PNG, JPG, SVG. Tamanho recomendado: 400x400px
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {perms.canEdit && (
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  className="bg-gradient-to-r from-blue-500 to-purple-600"
+                  disabled={saveMutation.isPending}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {saveMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
+                </Button>
+              </div>
+            )}
           </fieldset>
         </form>
       </div>
