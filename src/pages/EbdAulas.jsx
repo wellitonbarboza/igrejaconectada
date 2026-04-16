@@ -180,6 +180,7 @@ export default function EbdAulas() {
         } else {
           await base44.entities.EbdPresenca.create({
             aula_id: aulaId,
+            classe_id: classeId,
             membro_id: membro.id,
             membro_nome: membro.nome_completo,
             presente,
@@ -217,6 +218,7 @@ export default function EbdAulas() {
       if (!nome.trim()) throw new Error('Informe o nome do visitante.');
       await base44.entities.EbdPresenca.create({
         aula_id: aulaId,
+        classe_id: classeId,
         membro_id: null,
         membro_nome: nome.trim(),
         presente: true,
