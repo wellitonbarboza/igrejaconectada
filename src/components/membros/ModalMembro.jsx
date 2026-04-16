@@ -83,6 +83,7 @@ export default function ModalMembro({
     data_obreiro: '',
     departamento_id: null,
     departamentos_ids: [],
+    participa_ebd: false,
     foto_url: '',
     foto_path: '',
     foto_bucket: STORAGE_BUCKETS.fotosMembros,
@@ -1210,6 +1211,24 @@ export default function ModalMembro({
                     </label>
                   ))
                 )}
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <div className="flex items-start gap-3 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                <Checkbox
+                  id="participa_ebd"
+                  checked={!!formData.participa_ebd}
+                  onCheckedChange={(checked) => handleChange('participa_ebd', !!checked)}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="participa_ebd" className="cursor-pointer font-semibold text-indigo-900">
+                    Participa da EBD?
+                  </Label>
+                  <p className="text-sm text-indigo-700 mt-1">
+                    Marque se o membro faz parte da Escola Bíblica Dominical. Ele aparecerá como sugestão ao matricular nas classes.
+                  </p>
+                </div>
               </div>
             </div>
 

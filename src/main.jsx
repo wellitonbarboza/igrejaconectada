@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from '@/context/AuthContext.jsx';
+import { ChurchProvider } from '@/context/ChurchContext.jsx';
 const queryClient = new QueryClient();
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -25,7 +26,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <ChurchProvider>
+            <App />
+          </ChurchProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

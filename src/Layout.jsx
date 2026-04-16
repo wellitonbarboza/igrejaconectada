@@ -4,10 +4,11 @@ import { createPageUrl } from '@/utils';
 import {
   describeRole,
   hasPageAccess,
-  getResolvedPermissions,
   isAdminUser,
+  isSuperAdmin,
 } from '@/utils/accessControl';
 import { useAuth } from '@/context/AuthContext.jsx';
+import { useChurch, isModuloAtivo } from '@/context/ChurchContext.jsx';
 import {
   LayoutDashboard,
   Users,
@@ -21,6 +22,17 @@ import {
   LogOut,
   Archive,
   Shield,
+  DollarSign,
+  TrendingUp,
+  BookOpen,
+  ClipboardCheck,
+  Wallet,
+  BarChart3,
+  School,
+  CalendarCheck,
+  Church,
+  SlidersHorizontal,
+  UserCog,
 } from 'lucide-react';
 import ieadLogo from '@/assets/iead-logo.svg';
 import {
@@ -41,72 +53,90 @@ import {
 export default function Layout({ children }) {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { igrejas, igrejaAtiva, modulosAtivos, isSuperAdmin: superAdmin, setIgrejaAtivaId } = useChurch();
 
-  const navigationItems = [
+  const groups = [
     {
-      title: 'Dashboard',
-      url: createPageUrl('Dashboard'),
-      icon: LayoutDashboard,
-      page: 'Dashboard',
+      label: 'Geral',
+      modulo: null,
+      items: [
+        { title: 'Dashboard', url: createPageUrl('Dashboard'), icon: LayoutDashboard, page: 'Dashboard' },
+      ],
     },
     {
-      title: 'Membros',
-      url: createPageUrl('Membros'),
-      icon: Users,
-      page: 'Membros',
+      label: 'Secretaria',
+      modulo: 'secretaria',
+      items: [
+        { title: 'Membros', url: createPageUrl('Membros'), icon: Users, page: 'Membros' },
+        { title: 'Arquivo Morto', url: createPageUrl('ArquivoMorto'), icon: Archive, page: 'ArquivoMorto' },
+        { title: 'Departamentos', url: createPageUrl('Departamentos'), icon: GitBranch, page: 'Departamentos' },
+        { title: 'Congregações', url: createPageUrl('Congregacoes'), icon: Building2, page: 'Congregacoes' },
+        { title: 'Relatórios', url: createPageUrl('Relatorios'), icon: FileText, page: 'Relatorios' },
+        { title: 'Cartas', url: createPageUrl('Cartas'), icon: Mail, page: 'Cartas' },
+        { title: 'Cartões', url: createPageUrl('Cartoes'), icon: CreditCard, page: 'Cartoes' },
+      ],
     },
     {
-      title: 'Arquivo Morto',
-      url: createPageUrl('ArquivoMorto'),
-      icon: Archive,
-      page: 'ArquivoMorto',
+      label: 'Tesouraria',
+      modulo: 'tesouraria',
+      items: [
+        { title: 'Lançamentos', url: createPageUrl('TesourariaLancamentos'), icon: DollarSign, page: 'TesourariaLancamentos' },
+        { title: 'Fluxo de Caixa', url: createPageUrl('TesourariaFluxoCaixa'), icon: Wallet, page: 'TesourariaFluxoCaixa' },
+        { title: 'Relatórios', url: createPageUrl('TesourariaRelatorios'), icon: TrendingUp, page: 'TesourariaRelatorios' },
+      ],
     },
     {
-      title: 'Departamentos',
-      url: createPageUrl('Departamentos'),
-      icon: GitBranch,
-      page: 'Departamentos',
+      label: 'EBD',
+      modulo: 'ebd',
+      items: [
+        { title: 'Classes', url: createPageUrl('EbdClasses'), icon: School, page: 'EbdClasses' },
+        { title: 'Aulas & Presença', url: createPageUrl('EbdAulas'), icon: BookOpen, page: 'EbdAulas' },
+        { title: 'Caixa EBD', url: createPageUrl('EbdCaixa'), icon: Wallet, page: 'EbdCaixa' },
+        { title: 'Relatórios', url: createPageUrl('EbdRelatorios'), icon: BarChart3, page: 'EbdRelatorios' },
+      ],
     },
     {
-      title: 'Congregações',
-      url: createPageUrl('Congregacoes'),
-      icon: Building2,
-      page: 'Congregacoes',
+      label: 'Setores',
+      modulo: 'setores',
+      items: [
+        { title: 'Presença de Setores', url: createPageUrl('PresencaSetores'), icon: ClipboardCheck, page: 'PresencaSetores' },
+      ],
     },
     {
-      title: 'Usuários',
-      url: createPageUrl('Usuarios'),
-      icon: Users,
-      page: 'Usuarios',
+      label: 'Administração Geral',
+      modulo: 'admin',
+      superOnly: true,
+      items: [
+        { title: 'Igrejas', url: createPageUrl('AdminIgrejas'), icon: Church, page: 'AdminIgrejas' },
+        { title: 'Módulos por Igreja', url: createPageUrl('AdminModulos'), icon: SlidersHorizontal, page: 'AdminModulos' },
+        { title: 'Usuários', url: createPageUrl('Usuarios'), icon: UserCog, page: 'Usuarios' },
+      ],
     },
     {
-      title: 'Relatórios',
-      url: createPageUrl('Relatorios'),
-      icon: FileText,
-      page: 'Relatorios',
-    },
-    {
-      title: 'Cartas',
-      url: createPageUrl('Cartas'),
-      icon: Mail,
-      page: 'Cartas',
-    },
-    {
-      title: 'Cartões',
-      url: createPageUrl('Cartoes'),
-      icon: CreditCard,
-      page: 'Cartoes',
-    },
-    {
-      title: 'Configurações',
-      url: createPageUrl('Configuracoes'),
-      icon: Settings,
-      page: 'Configuracoes',
+      label: 'Configurações',
+      modulo: null,
+      items: [
+        { title: 'Configurações', url: createPageUrl('Configuracoes'), icon: Settings, page: 'Configuracoes' },
+      ],
     },
   ];
 
-  const visibleItems = navigationItems.filter((item) => hasPageAccess(user, item.page));
   const admin = isAdminUser(user);
+
+  const visibleGroups = groups
+    .map((group) => {
+      if (group.superOnly && !superAdmin) {
+        return { ...group, items: [] };
+      }
+      // Quando o módulo não está ativo para a igreja (exceto super admin), esconde o grupo.
+      const moduloLiberado = group.modulo === null || superAdmin || isModuloAtivo(modulosAtivos, group.modulo);
+      if (!moduloLiberado) return { ...group, items: [] };
+      const items = group.items.filter((item) => hasPageAccess(user, item.page));
+      return { ...group, items };
+    })
+    .filter((group) => group.items.length > 0);
+
+  const totalVisiblePages = visibleGroups.reduce((sum, g) => sum + g.items.length, 0);
 
   return (
     <SidebarProvider>
@@ -132,43 +162,69 @@ export default function Layout({ children }) {
           </SidebarHeader>
 
           <SidebarContent className="p-3">
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
-                Menu Principal
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {visibleItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        className={`hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 rounded-lg mb-1 ${
-                          location.pathname === item.url
-                            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white'
-                            : ''
-                        }`}
-                      >
-                        <Link to={item.url} className="flex items-center gap-3 px-3 py-2.5">
-                          <item.icon className="w-5 h-5" />
-                          <span className="font-medium">{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            {user?.congregacao_nome && (
+            {/* Seletor de igreja para super admin */}
+            {superAdmin && igrejas.length > 0 && (
               <SidebarGroup>
                 <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
-                  Sua Congregação
+                  Igreja (Super Admin)
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <div className="px-3 py-2">
+                    <select
+                      value={igrejaAtiva?.id || ''}
+                      onChange={(e) => setIgrejaAtivaId(e.target.value)}
+                      className="w-full text-xs rounded-md border border-slate-200 px-2 py-1.5 bg-white"
+                    >
+                      {igrejas.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
+
+            {visibleGroups.map((group) => (
+              <SidebarGroup key={group.label}>
+                <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
+                  {group.label}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {group.items.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          className={`hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 rounded-lg mb-1 ${
+                            location.pathname === item.url
+                              ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white'
+                              : ''
+                          }`}
+                        >
+                          <Link to={item.url} className="flex items-center gap-3 px-3 py-2.5">
+                            <item.icon className="w-5 h-5" />
+                            <span className="font-medium">{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
+
+            {igrejaAtiva && (
+              <SidebarGroup>
+                <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
+                  Igreja Atual
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <div className="px-3 py-2 bg-slate-50 rounded-lg">
                     <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="w-4 h-4 text-slate-400" />
-                      <span className="font-medium text-slate-700">{user.congregacao_nome}</span>
+                      <Church className="w-4 h-4 text-slate-400" />
+                      <span className="font-medium text-slate-700 truncate">{igrejaAtiva.nome}</span>
                     </div>
                   </div>
                 </SidebarGroupContent>
@@ -184,24 +240,25 @@ export default function Layout({ children }) {
                     {user?.full_name?.charAt(0) || 'U'}
                   </span>
                 </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-900 text-sm truncate">
-                  {user?.full_name || 'Usuário'}
-                </p>
-                <p className="text-xs text-slate-500 truncate">
-                  {describeRole(user?.role)}
-                  {user?.cargo ? ` · ${user.cargo}` : ''}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-900 text-sm truncate">
+                    {user?.full_name || 'Usuário'}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {superAdmin ? 'Super Admin' : describeRole(user?.role)}
+                    {user?.cargo ? ` · ${user.cargo}` : ''}
+                  </p>
+                </div>
               </div>
-            </div>
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
                 <div className="flex items-center gap-1.5">
                   <Shield className="w-3 h-3 text-blue-600" />
                   <span className="text-xs font-semibold text-blue-700">
-                    {admin
+                    {superAdmin
+                      ? 'Super Admin (acesso global)'
+                      : admin
                       ? 'Acesso total (Administrador)'
-                      : `${visibleItems.length} página${visibleItems.length !== 1 ? 's' : ''} liberada${visibleItems.length !== 1 ? 's' : ''}`
-                    }
+                      : `${totalVisiblePages} página${totalVisiblePages !== 1 ? 's' : ''} liberada${totalVisiblePages !== 1 ? 's' : ''}`}
                   </span>
                 </div>
               </div>

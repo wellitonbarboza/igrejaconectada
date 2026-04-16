@@ -3,6 +3,14 @@ export const ROLES = {
   USUARIO: 'usuario',
 };
 
+export const SUPER_ADMIN_EMAIL = 'welliton.tec@hotmail.com';
+
+export const isSuperAdmin = (user) => {
+  if (!user) return false;
+  if (user.is_super_admin) return true;
+  return (user.email || '').toLowerCase() === SUPER_ADMIN_EMAIL;
+};
+
 export const ACTIONS = {
   VIEW: 'view',
   CREATE: 'create',
@@ -21,18 +29,35 @@ export const ACTION_LABELS = {
  * Páginas configuráveis com as ações CRUD disponíveis em cada uma.
  */
 export const ALL_MANAGEABLE_PAGES = [
-  { page: 'Dashboard', label: 'Dashboard', actions: ['view'] },
-  { page: 'Membros', label: 'Membros', actions: ['view', 'create', 'edit', 'delete'] },
-  { page: 'ArquivoMorto', label: 'Arquivo Morto', actions: ['view', 'edit'] },
-  { page: 'DetalhesMembro', label: 'Detalhes do Membro', actions: ['view'] },
-  { page: 'Departamentos', label: 'Departamentos', actions: ['view', 'create', 'edit', 'delete'] },
-  { page: 'DetalhesDepartamento', label: 'Detalhes do Departamento', actions: ['view'] },
-  { page: 'Congregacoes', label: 'Congregações', actions: ['view', 'create', 'edit', 'delete'] },
-  { page: 'Relatorios', label: 'Relatórios', actions: ['view'] },
-  { page: 'Cartoes', label: 'Cartões', actions: ['view'] },
-  { page: 'Cartas', label: 'Cartas', actions: ['view', 'create', 'edit', 'delete'] },
-  { page: 'Configuracoes', label: 'Configurações', actions: ['view', 'edit'] },
-  { page: 'Download', label: 'Download', actions: ['view'] },
+  { page: 'Dashboard', label: 'Dashboard', actions: ['view'], modulo: null },
+  // Secretaria
+  { page: 'Membros', label: 'Membros', actions: ['view', 'create', 'edit', 'delete'], modulo: 'secretaria' },
+  { page: 'ArquivoMorto', label: 'Arquivo Morto', actions: ['view', 'edit'], modulo: 'secretaria' },
+  { page: 'DetalhesMembro', label: 'Detalhes do Membro', actions: ['view'], modulo: 'secretaria' },
+  { page: 'Departamentos', label: 'Departamentos', actions: ['view', 'create', 'edit', 'delete'], modulo: 'secretaria' },
+  { page: 'DetalhesDepartamento', label: 'Detalhes do Departamento', actions: ['view'], modulo: 'secretaria' },
+  { page: 'Congregacoes', label: 'Congregações', actions: ['view', 'create', 'edit', 'delete'], modulo: 'secretaria' },
+  { page: 'Relatorios', label: 'Relatórios', actions: ['view'], modulo: 'secretaria' },
+  { page: 'Cartoes', label: 'Cartões', actions: ['view'], modulo: 'secretaria' },
+  { page: 'Cartas', label: 'Cartas', actions: ['view', 'create', 'edit', 'delete'], modulo: 'secretaria' },
+  // Tesouraria
+  { page: 'TesourariaLancamentos', label: 'Tesouraria · Lançamentos', actions: ['view', 'create', 'edit', 'delete'], modulo: 'tesouraria' },
+  { page: 'TesourariaFluxoCaixa', label: 'Tesouraria · Fluxo de Caixa', actions: ['view'], modulo: 'tesouraria' },
+  { page: 'TesourariaRelatorios', label: 'Tesouraria · Relatórios', actions: ['view'], modulo: 'tesouraria' },
+  // EBD
+  { page: 'EbdClasses', label: 'EBD · Classes', actions: ['view', 'create', 'edit', 'delete'], modulo: 'ebd' },
+  { page: 'EbdAulas', label: 'EBD · Aulas e Presença', actions: ['view', 'create', 'edit', 'delete'], modulo: 'ebd' },
+  { page: 'EbdRelatorios', label: 'EBD · Relatórios', actions: ['view'], modulo: 'ebd' },
+  { page: 'EbdCaixa', label: 'EBD · Caixa', actions: ['view', 'create', 'edit', 'delete'], modulo: 'ebd' },
+  // Setores
+  { page: 'PresencaSetores', label: 'Presença de Setores', actions: ['view', 'create', 'edit', 'delete'], modulo: 'setores' },
+  // Admin geral
+  { page: 'AdminIgrejas', label: 'Admin · Igrejas', actions: ['view', 'create', 'edit', 'delete'], modulo: 'admin' },
+  { page: 'AdminModulos', label: 'Admin · Módulos por Igreja', actions: ['view', 'edit'], modulo: 'admin' },
+  { page: 'Usuarios', label: 'Usuários', actions: ['view', 'create', 'edit', 'delete'], modulo: 'admin' },
+  // Outros
+  { page: 'Configuracoes', label: 'Configurações', actions: ['view', 'edit'], modulo: null },
+  { page: 'Download', label: 'Download', actions: ['view'], modulo: null },
 ];
 
 /**

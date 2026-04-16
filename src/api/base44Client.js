@@ -493,8 +493,6 @@ async function assertAuthenticatedForPhotoUpload() {
   if (!authUser?.id) {
     throw new Error('Sessão inválida para upload. Faça login novamente.');
   }
-  // The actual upload uses the service role key which bypasses RLS.
-  // We only need to verify the user is authenticated.
   return authUser;
 }
 
@@ -587,6 +585,16 @@ export const base44 = {
     Config: createEntityClient('configs'),
     Perfil: createEntityClient('profiles'),
     CartaEmitida: createEntityClient('cartas_emitidas'),
+    Igreja: createEntityClient('igrejas'),
+    IgrejaModulo: createEntityClient('igreja_modulos'),
+    LancamentoFinanceiro: createEntityClient('lancamentos_financeiros'),
+    EbdClasse: createEntityClient('ebd_classes'),
+    EbdMatricula: createEntityClient('ebd_matriculas'),
+    EbdAula: createEntityClient('ebd_aulas'),
+    EbdPresenca: createEntityClient('ebd_presencas'),
+    EbdFinanceiro: createEntityClient('ebd_financeiro'),
+    SetorReuniao: createEntityClient('setor_reunioes'),
+    SetorPresenca: createEntityClient('setor_presencas'),
   },
   integrations: {
     Core: {
@@ -603,11 +611,12 @@ export const base44 = {
           await assertAuthenticatedForPhotoUpload();
         }
 
-        // Photo buckets use the service role key to bypass RLS policies that
-        // may not have been applied correctly.  Admin permission is already
-        // validated above by assertAdminForPhotoUpload().
-        const authToken = isPhotoBucket ? getAdminAuthToken() : getRequiredAuthToken();
-        const apiKey = isPhotoBucket ? getAdminApiKey() : SUPABASE_ANON_KEY;
+        // Usa SEMPRE o token da sessão autenticada do usuário. As policies de
+        // storage (migration 20260416120000_fix_photo_upload_authenticated)
+        // autorizam qualquer usuário autenticado a gravar nos buckets de
+        // fotos/documentos. O service_role nunca deve ser usado no frontend.
+        const authToken = getRequiredAuthToken();
+        const apiKey = SUPABASE_ANON_KEY;
         const extension = file.name?.split('.').pop() || 'bin';
         const fileName =
           path ||
@@ -649,8 +658,8 @@ export const base44 = {
           await assertAuthenticatedForPhotoUpload();
         }
 
-        const authToken = isPhotoBucket ? getAdminAuthToken() : getRequiredAuthToken();
-        const apiKey = isPhotoBucket ? getAdminApiKey() : SUPABASE_ANON_KEY;
+        const authToken = getRequiredAuthToken();
+        const apiKey = SUPABASE_ANON_KEY;
         const encodedPath = path
           .split('/')
           .map((segment) => encodeURIComponent(segment))
@@ -674,6 +683,8 @@ export const base44 = {
     },
   },
 };
+
+export const SUPER_ADMIN_EMAIL_EXPORT = SUPER_ADMIN_EMAIL;
 
 export const buildStoragePublicUrl = (bucket, path) => {
   if (!SUPABASE_URL || !bucket || !path) return '';
