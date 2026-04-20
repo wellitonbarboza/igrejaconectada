@@ -141,22 +141,15 @@ export default function Layout({ children }) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
-        <style>{`
-          :root {
-            --primary: 239 84% 67%;
-            --primary-foreground: 0 0% 100%;
-          }
-        `}</style>
-
         <Sidebar className="border-r border-slate-200 bg-white">
           <SidebarHeader className="border-b border-slate-200 p-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-white border border-blue-100 overflow-hidden">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md bg-white border border-sky-100 overflow-hidden">
                 <ChurchLogo alt={igrejaAtiva?.nome ? `Logo ${igrejaAtiva.nome}` : 'Logo Igreja Digital'} className="w-8 h-8 object-contain" />
               </div>
-              <div>
-                <h2 className="font-bold text-slate-900 text-lg truncate max-w-[180px]">{igrejaAtiva?.nome || 'Igreja Digital'}</h2>
-                <p className="text-xs text-slate-500">Sistema de Gestão</p>
+              <div className="min-w-0">
+                <h2 className="font-display font-bold text-slate-900 text-[15px] leading-tight tracking-tight truncate max-w-[180px]">{igrejaAtiva?.nome || 'Igreja Digital'}</h2>
+                <p className="text-[11px] text-slate-500">Sistema de Gestão</p>
               </div>
             </div>
           </SidebarHeader>
@@ -165,7 +158,7 @@ export default function Layout({ children }) {
             {/* Seletor de igreja para super admin */}
             {superAdmin && igrejas.length > 0 && (
               <SidebarGroup>
-                <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
+                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-500 uppercase tracking-[0.1em] px-3 py-2">
                   Igreja (Super Admin)
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -188,7 +181,7 @@ export default function Layout({ children }) {
 
             {visibleGroups.map((group) => (
               <SidebarGroup key={group.label}>
-                <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
+                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-500 uppercase tracking-[0.1em] px-3 py-2">
                   {group.label}
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -197,9 +190,9 @@ export default function Layout({ children }) {
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
                           asChild
-                          className={`hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 rounded-lg mb-1 ${
+                          className={`hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200 rounded-lg mb-1 ${
                             location.pathname === item.url
-                              ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white'
+                              ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white hover:from-blue-500 hover:to-purple-600 shadow-indigo'
                               : ''
                           }`}
                         >
@@ -217,7 +210,7 @@ export default function Layout({ children }) {
 
             {igrejaAtiva && (
               <SidebarGroup>
-                <SidebarGroupLabel className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-3 py-2">
+                <SidebarGroupLabel className="text-[10.5px] font-bold text-slate-500 uppercase tracking-[0.1em] px-3 py-2">
                   Igreja Atual
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -250,10 +243,10 @@ export default function Layout({ children }) {
                   </p>
                 </div>
               </div>
-              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
                 <div className="flex items-center gap-1.5">
-                  <Shield className="w-3 h-3 text-blue-600" />
-                  <span className="text-xs font-semibold text-blue-700">
+                  <Shield className="w-3 h-3 text-indigo-600" />
+                  <span className="text-xs font-semibold text-indigo-700">
                     {superAdmin
                       ? 'Super Admin (acesso global)'
                       : admin
