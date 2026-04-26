@@ -46,7 +46,6 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
     queryKey: ['congregacoes'],
     queryFn: () => base44.entities.Congregacao.list('nome'),
     initialData: [],
-    enabled: isAdmin,
   });
 
   const normalizeDepartamentoPayload = (data) => {
@@ -210,24 +209,22 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
               />
             </div>
 
-            {isAdmin && (
-              <div>
-                <Label htmlFor="congregacao_id">Congregação</Label>
-                <Select value={formData.congregacao_id || ''} onValueChange={(value) => handleChange('congregacao_id', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas (departamento global)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todas (departamento global)</SelectItem>
-                    {congregacoes.map((cong) => (
-                      <SelectItem key={cong.id} value={cong.id}>
-                        {cong.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div>
+              <Label htmlFor="congregacao_id">Congregação</Label>
+              <Select value={formData.congregacao_id || ''} onValueChange={(value) => handleChange('congregacao_id', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas (departamento global)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas (departamento global)</SelectItem>
+                  {congregacoes.map((cong) => (
+                    <SelectItem key={cong.id} value={cong.id}>
+                      {cong.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div>
               <Label htmlFor="lider_id">Líder do Departamento</Label>
