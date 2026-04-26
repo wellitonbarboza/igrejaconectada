@@ -673,23 +673,21 @@ export default function ModalMembro({
               </Select>
             </div>
 
-            {isAdmin && (
-              <div>
-                <Label htmlFor="congregacao_id">Congregação *</Label>
-                <Select value={formData.congregacao_id || ''} onValueChange={(value) => handleChange('congregacao_id', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {congregacoes.map((cong) => (
-                      <SelectItem key={cong.id} value={cong.id}>
-                        {cong.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div>
+              <Label htmlFor="congregacao_id">Congregação *</Label>
+              <Select value={formData.congregacao_id || ''} onValueChange={(value) => handleChange('congregacao_id', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {congregacoes.map((cong) => (
+                    <SelectItem key={cong.id} value={cong.id}>
+                      {cong.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div>
               <Label htmlFor="data_nascimento">Data de Nascimento</Label>
