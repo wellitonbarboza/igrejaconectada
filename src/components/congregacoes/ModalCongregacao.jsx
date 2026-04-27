@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function ModalCongregacao({ congregacao, onClose, readOnly = false }) {
@@ -162,8 +163,25 @@ export default function ModalCongregacao({ congregacao, onClose, readOnly = fals
                 placeholder="Nome do responsável"
               />
             </div>
+
+            <div className="md:col-span-2 flex items-center gap-3 pt-2">
+              <Checkbox
+                id="ativa"
+                checked={Boolean(formData.ativa)}
+                onCheckedChange={(value) => handleChange('ativa', Boolean(value))}
+              />
+              <Label htmlFor="ativa" className="cursor-pointer">
+                Congregação ativa
+              </Label>
+            </div>
           </div>
           </fieldset>
+
+          {saveMutation.isError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {saveMutation.error?.message || 'Erro ao salvar a congregação.'}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>

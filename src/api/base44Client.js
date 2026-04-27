@@ -437,7 +437,7 @@ function createEntityClient(table) {
     async update(id, payload) {
       const { id: _ignoredId, ...payloadWithoutId } = payload || {};
       const sanitizedPayload = sanitizePayload(payloadWithoutId);
-      return authenticatedRequest(`/rest/v1/${table}`, {
+      const result = await authenticatedRequest(`/rest/v1/${table}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -446,6 +446,14 @@ function createEntityClient(table) {
         body: sanitizedPayload,
         query: `?id=eq.${encodeURIComponent(id)}&select=*`,
       });
+      // Quando o RLS bloqueia o update, o PostgREST retorna 200 com array vazio.
+      // Sem esta verificação, a UI mostraria "salvo" e voltaria ao valor anterior.
+      if (Array.isArray(result) && result.length === 0) {
+        throw new Error(
+          'Não foi possível salvar as alterações. Verifique se você tem permissão para editar este registro.'
+        );
+      }
+      return result;
     },
     async delete(id) {
       return authenticatedRequest(`/rest/v1/${table}`, {
