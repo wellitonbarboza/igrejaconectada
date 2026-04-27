@@ -288,8 +288,25 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
                 )}
               </div>
             </div>
+
+            <div className="md:col-span-2 flex items-center gap-3 pt-2">
+              <Checkbox
+                id="departamento-ativo"
+                checked={Boolean(formData.ativo)}
+                onCheckedChange={(value) => handleChange('ativo', Boolean(value))}
+              />
+              <Label htmlFor="departamento-ativo" className="cursor-pointer">
+                Departamento ativo
+              </Label>
+            </div>
           </div>
           </fieldset>
+
+          {saveMutation.isError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {saveMutation.error?.message || 'Erro ao salvar o departamento.'}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose}>
