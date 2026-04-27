@@ -116,6 +116,7 @@ create policy "membros_delete_with_permission"
 
 -- 6) profiles: ampliar policies para considerar a permissão "Usuarios" também.
 drop policy if exists "profiles_insert_admin" on public.profiles;
+drop policy if exists "profiles_insert_admin_or_self" on public.profiles;
 drop policy if exists "profiles_delete_admin" on public.profiles;
 drop policy if exists "profiles_update_admin_or_self" on public.profiles;
 drop policy if exists "profiles_insert_with_permission" on public.profiles;
@@ -125,7 +126,10 @@ drop policy if exists "profiles_update_with_permission" on public.profiles;
 create policy "profiles_insert_with_permission"
   on public.profiles for insert
   to authenticated
-  with check (public.has_permission('Usuarios', 'create'));
+  with check (
+    id = auth.uid()
+    or public.has_permission('Usuarios', 'create')
+  );
 
 create policy "profiles_update_with_permission"
   on public.profiles for update
@@ -143,3 +147,85 @@ create policy "profiles_delete_with_permission"
   on public.profiles for delete
   to authenticated
   using (public.has_permission('Usuarios', 'delete'));
+
+-- 7) Storage: liberar upload/edição/remoção de foto-membro/avatar para usuários
+--    com permissão de edição/criação em "Membros". Mantém o mesmo guard de
+--    ownership de storage.objects usado nas migrations anteriores.
+do $$
+declare
+  objects_owner text;
+begin
+  select pg_catalog.pg_get_userbyid(c.relowner)
+    into objects_owner
+  from pg_catalog.pg_class c
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'storage'
+    and c.relname = 'objects'
+    and c.relkind = 'r';
+
+  if objects_owner is null then
+    raise notice 'Tabela storage.objects não encontrada. Pulando policies de storage.';
+    return;
+  end if;
+
+  if objects_owner <> current_user then
+    raise notice 'Sem ownership em storage.objects (owner=% , current_user=%). Pulando policies de storage nesta migration.', objects_owner, current_user;
+    return;
+  end if;
+
+  execute 'drop policy if exists "storage_photo_upload_admin" on storage.objects';
+  execute 'drop policy if exists "storage_photo_update_admin" on storage.objects';
+  execute 'drop policy if exists "storage_photo_delete_admin" on storage.objects';
+  execute 'drop policy if exists "storage_photo_upload_with_permission" on storage.objects';
+  execute 'drop policy if exists "storage_photo_update_with_permission" on storage.objects';
+  execute 'drop policy if exists "storage_photo_delete_with_permission" on storage.objects';
+
+  execute $policy$
+    create policy "storage_photo_upload_with_permission"
+    on storage.objects
+    for insert
+    to authenticated
+    with check (
+      bucket_id in ('fotos-membros', 'avatares')
+      and (
+        public.has_permission('Membros', 'create')
+        or public.has_permission('Membros', 'edit')
+      )
+    )
+  $policy$;
+
+  execute $policy$
+    create policy "storage_photo_update_with_permission"
+    on storage.objects
+    for update
+    to authenticated
+    using (
+      bucket_id in ('fotos-membros', 'avatares')
+      and (
+        public.has_permission('Membros', 'create')
+        or public.has_permission('Membros', 'edit')
+      )
+    )
+    with check (
+      bucket_id in ('fotos-membros', 'avatares')
+      and (
+        public.has_permission('Membros', 'create')
+        or public.has_permission('Membros', 'edit')
+      )
+    )
+  $policy$;
+
+  execute $policy$
+    create policy "storage_photo_delete_with_permission"
+    on storage.objects
+    for delete
+    to authenticated
+    using (
+      bucket_id in ('fotos-membros', 'avatares')
+      and (
+        public.has_permission('Membros', 'edit')
+        or public.has_permission('Membros', 'delete')
+      )
+    )
+  $policy$;
+end $$;
