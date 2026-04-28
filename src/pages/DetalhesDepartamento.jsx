@@ -30,6 +30,12 @@ export default function DetalhesDepartamento() {
     initialData: [],
   });
 
+  const { data: congregacoes = [] } = useQuery({
+    queryKey: ['congregacoes'],
+    queryFn: () => base44.entities.Congregacao.list('nome'),
+    initialData: [],
+  });
+
   if (isLoading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
