@@ -539,7 +539,7 @@ export default function ModalMembro({
               membro={membro}
               uploading={uploading}
               error={uploadError}
-              onPhotoReady={(file) => {
+              onPhotoReady={(file, uploadResult) => {
                 pendingFotoFileRef.current = file;
                 if (!file) {
                   updateFormData((prev) => ({
@@ -548,6 +548,20 @@ export default function ModalMembro({
                     foto_path: '',
                     foto_bucket: STORAGE_BUCKETS.fotosMembros,
                   }));
+                  return;
+                }
+                // Upload imediato concluido: sincroniza formData para
+                // que o Salvar nao sobrescreva foto_url com vazio.
+                if (uploadResult?.file_url) {
+                  updateFormData((prev) => ({
+                    ...prev,
+                    foto_url: uploadResult.file_url,
+                    foto_path: uploadResult.filePath,
+                    foto_bucket: STORAGE_BUCKETS.fotosMembros,
+                  }));
+                  // pendingFile ja foi processado pelo componente de foto;
+                  // limpa para evitar re-upload no Salvar.
+                  pendingFotoFileRef.current = null;
                 }
               }}
             />
