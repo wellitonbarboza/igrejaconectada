@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Upload, Camera, X, Loader2 } from 'lucide-react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { compressImage } from '@/utils/imageCompression';
@@ -9,71 +8,91 @@ const VALID_TYPES = [
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
   'image/heic', 'image/heif', 'image/avif', 'image/gif',
 ];
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_SIZE = 10 * 1024 * 1024;
 
 export default function FotoMembroUpload({ membro, onPhotoReady, uploading = false, error = '' }) {
   const [fileName, setFileName] = useState('');
   const [localError, setLocalError] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const objectUrlRef = useRef('');
-  const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
-  // IDs únicos para evitar colisão se múltiplos componentes renderizarem.
-  const idSuffix = useRef(Math.random().toString(36).slice(2, 9)).current;
-  const fileInputId = `foto-membro-file-${idSuffix}`;
-  const cameraInputId = `foto-membro-camera-${idSuffix}`;
+  const onPhotoReadyRef = useRef(onPhotoReady);
   const existingPhotoUrl = membro ? resolveMemberPhotoUrl(membro) : '';
 
-  useEffect(() => () => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-  }, []);
+  // mantém callback atualizada sem recriar inputs
+  useEffect(() => { onPhotoReadyRef.current = onPhotoReady; }, [onPhotoReady]);
 
-  // FIX React18 + Portal: listeners React (onChange) nao captam eventos
-  // em inputs renderizados via createPortal para document.body, porque
-  // React 18 anexa delegacao de eventos no root container (#root) e nao
-  // no document. Por isso usamos addEventListener vanilla via ref.
-  useEffect(() => {
-    const file = fileInputRef.current;
-    const cam = cameraInputRef.current;
-    if (!file && !cam) return;
-    file?.addEventListener('change', handleFileSelect);
-    cam?.addEventListener('change', handleFileSelect);
-    return () => {
-      file?.removeEventListener('change', handleFileSelect);
-      cam?.removeEventListener('change', handleFileSelect);
-    };
-  }, []);
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) {
-      console.log('[FotoMembro] sem arquivo selecionado (cancelou)');
-      return;
-    }
-    console.log('[FotoMembro] arquivo selecionado:', file.name, file.type, file.size);
-    const isImage =
-      (file.type && file.type.startsWith('image/')) ||
-      VALID_TYPES.includes(file.type) ||
-      /\.(heic|heif|jpe?g|png|webp|avif|gif)$/i.test(file.name);
-    if (!isImage) {
-      setLocalError(`Formato não suportado: ${file.type || file.name}`);
-      console.warn('[FotoMembro] formato rejeitado:', file.type, file.name);
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      setLocalError(`Foto muito grande: ${(file.size / 1024 / 1024).toFixed(1)}MB. Máx 10MB.`);
-      return;
-    }
-    setLocalError('');
+  const setPreviewFromFile = (file) => {
     setFileName(file.name);
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     const url = URL.createObjectURL(file);
     objectUrlRef.current = url;
     setPreviewUrl(url);
-    console.log('[FotoMembro] onPhotoReady chamado com file');
-    onPhotoReady(file);
   };
+
+  // Refs para os inputs reais (criados via DOM, não JSX)
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+
+  // Cria os inputs UMA VEZ via DOM e anexa ao body. Persiste entre re-renders
+  // porque não fazem parte do React tree. Resolve o bug em que React desmontava
+  // o input entre o click do user e o evento change do file picker.
+  useEffect(() => {
+    const handleFileSelect = (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = ''; // permite re-selecionar mesmo arquivo
+      if (!file) {
+        console.log('[FotoMembro] sem arquivo (cancelou)');
+        return;
+      }
+      console.log('[FotoMembro] arquivo selecionado:', file.name, file.type, file.size);
+      const isImage = (file.type && file.type.startsWith('image/'))
+        || VALID_TYPES.includes(file.type)
+        || /\.(heic|heif|jpe?g|png|webp|avif|gif)$/i.test(file.name);
+      if (!isImage) {
+        setLocalError(`Formato não suportado: ${file.type || file.name}`);
+        return;
+      }
+      if (file.size > MAX_SIZE) {
+        setLocalError(`Foto muito grande: ${(file.size / 1024 / 1024).toFixed(1)}MB. Máx 10MB.`);
+        return;
+      }
+      setLocalError('');
+      setPreviewFromFile(file);
+      console.log('[FotoMembro] onPhotoReady chamado');
+      onPhotoReadyRef.current?.(file);
+    };
+
+    const make = (capture = false) => {
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = 'image/*,.heic,.heif';
+      if (capture) inp.setAttribute('capture', 'environment');
+      inp.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.001';
+      inp.addEventListener('change', handleFileSelect);
+      document.body.appendChild(inp);
+      return inp;
+    };
+
+    fileInputRef.current = make(false);
+    cameraInputRef.current = make(true);
+
+    return () => {
+      fileInputRef.current?.removeEventListener('change', handleFileSelect);
+      cameraInputRef.current?.removeEventListener('change', handleFileSelect);
+      fileInputRef.current?.remove();
+      cameraInputRef.current?.remove();
+    };
+  }, []);
+
+  // disable durante upload
+  useEffect(() => {
+    if (fileInputRef.current) fileInputRef.current.disabled = uploading;
+    if (cameraInputRef.current) cameraInputRef.current.disabled = uploading;
+  }, [uploading]);
+
+  useEffect(() => () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+  }, []);
 
   const handleRemove = () => {
     if (objectUrlRef.current) {
@@ -83,39 +102,19 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
     setPreviewUrl('');
     setFileName('');
     setLocalError('');
-    onPhotoReady(null);
+    onPhotoReadyRef.current?.(null);
+  };
+
+  const triggerUpload = (which) => {
+    const ref = which === 'camera' ? cameraInputRef : fileInputRef;
+    ref.current?.click();
   };
 
   const displayError = error || localError;
   const displayedPhoto = previewUrl || existingPhotoUrl;
 
-  // Inputs renderizados via portal em document.body (FORA do Dialog).
-  const portalInputs = typeof document !== 'undefined' ? createPortal(
-    <>
-      <input
-        ref={fileInputRef}
-        id={fileInputId}
-        type="file"
-        accept="image/*,.heic,.heif"
-        disabled={uploading}
-        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001 }}
-      />
-      <input
-        ref={cameraInputRef}
-        id={cameraInputId}
-        type="file"
-        accept="image/*,.heic,.heif"
-        capture="environment"
-        disabled={uploading}
-        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001 }}
-      />
-    </>,
-    document.body
-  ) : null;
-
   return (
     <div className="md:col-span-2">
-      {portalInputs}
       <span className="text-sm font-medium">Foto do Membro</span>
       <div className="mt-2 flex items-start gap-4">
         {displayedPhoto && (
@@ -139,20 +138,24 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
         )}
         <div className="flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <label
-              htmlFor={fileInputId}
-              className={`inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+            <button
+              type="button"
+              onClick={() => triggerUpload('file')}
+              disabled={uploading}
+              className="inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
               <Upload className="w-4 h-4 mr-2" />
               Carregar Foto
-            </label>
-            <label
-              htmlFor={cameraInputId}
-              className={`inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => triggerUpload('camera')}
+              disabled={uploading}
+              className="inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
               <Camera className="w-4 h-4 mr-2" />
               Câmera
-            </label>
+            </button>
             {uploading && (
               <span className="inline-flex items-center text-sm text-slate-500">
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Enviando...
