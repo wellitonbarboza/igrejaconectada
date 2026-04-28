@@ -83,7 +83,7 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
         accept="image/*,.heic,.heif"
         onChange={handleFileSelect}
         disabled={uploading}
-        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001, pointerEvents: 'none' }}
       />
       <input
         ref={cameraInputRef}
@@ -93,7 +93,7 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
         capture="environment"
         onChange={handleFileSelect}
         disabled={uploading}
-        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001, pointerEvents: 'none' }}
       />
     </>,
     document.body
