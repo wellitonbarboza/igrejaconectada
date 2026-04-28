@@ -60,6 +60,44 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
     onPhotoReadyRef.current?.(null);
   };
 
+  const [deletingExisting, setDeletingExisting] = useState(false);
+  const handleRemoveExisting = async () => {
+    if (!membro?.id) return;
+    if (!window.confirm('Tem certeza que deseja remover a foto deste membro?')) return;
+    setDeletingExisting(true);
+    setLocalError('');
+    try {
+      // Remove file do Storage
+      if (membro.foto_path) {
+        try {
+          await base44.integrations.Core.DeleteFile({
+            bucket: membro.foto_bucket || STORAGE_BUCKETS.fotosMembros,
+            path: membro.foto_path,
+          });
+          console.log('[FotoMembro] arquivo removido do Storage');
+        } catch (err) {
+          console.warn('[FotoMembro] falha ao remover arquivo do Storage (segue):', err);
+        }
+      }
+      // Update membro: zera campos de foto
+      await base44.entities.Membro.update(membro.id, {
+        foto_url: null,
+        foto_path: null,
+        foto_bucket: STORAGE_BUCKETS.fotosMembros,
+      });
+      console.log('[FotoMembro] membro atualizado: foto removida');
+      // Notifica pai p/ recarregar
+      onPhotoReadyRef.current?.(null, { removed: true });
+      // Limpa estado local pra esconder o avatar
+      handleRemove();
+    } catch (err) {
+      console.error('[FotoMembro] erro ao remover foto:', err);
+      setLocalError('Falha ao remover foto: ' + (err?.message || 'tente novamente'));
+    } finally {
+      setDeletingExisting(false);
+    }
+  };
+
   const openPicker = (capture) => {
     if (uploading) return;
     console.log('[FotoMembro] criando input dinâmico, capture=', capture);
@@ -120,12 +158,26 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
               alt={previewUrl ? 'Nova foto selecionada' : 'Foto atual'}
               className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
             />
-            {previewUrl && !uploading && (
+            {/* X vermelho: remove foto NÃO SALVA (preview local) */}
+            {previewUrl && !uploading && !deletingExisting && (
               <button type="button" onClick={handleRemove}
                 className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
-                title="Remover">
+                title="Cancelar nova foto">
                 <X className="w-3 h-3" />
               </button>
+            )}
+            {/* X cinza: remove foto JÁ SALVA do membro */}
+            {!previewUrl && existingPhotoUrl && !uploading && !deletingExisting && (
+              <button type="button" onClick={handleRemoveExisting}
+                className="absolute -top-1 -right-1 bg-slate-700 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                title="Excluir foto salva">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+            {deletingExisting && (
+              <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              </div>
             )}
           </div>
         )}
