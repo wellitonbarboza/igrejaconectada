@@ -71,8 +71,16 @@ export default function PresencaSetores() {
       .sort((a, b) => (b.data_reuniao || '').localeCompare(a.data_reuniao || ''));
   }, [reunioes, departamentoId]);
 
+  const departamentoSelecionado = useMemo(
+    () => (departamentos || []).find((d) => d.id === departamentoId),
+    [departamentos, departamentoId]
+  );
   const membrosDoDepartamento = useMemo(() => {
     if (!departamentoId) return [];
+    // Departamento fixo "Obreiros" lista membros com flag obreiro=true
+    if (departamentoSelecionado?.slug === 'obreiros') {
+      return (membros || []).filter((m) => m.obreiro === true);
+    }
     return membros
       .filter((m) => {
         const ids = Array.isArray(m.departamentos_ids) ? m.departamentos_ids : (m.departamento_id ? [m.departamento_id] : []);
