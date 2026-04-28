@@ -15,80 +15,16 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
   const [localError, setLocalError] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const objectUrlRef = useRef('');
+  // Refs estáveis para handlers (evita closure stale entre renders)
   const onPhotoReadyRef = useRef(onPhotoReady);
-  const existingPhotoUrl = membro ? resolveMemberPhotoUrl(membro) : '';
+  const setFileNameRef = useRef(setFileName);
+  const setLocalErrorRef = useRef(setLocalError);
+  const setPreviewUrlRef = useRef(setPreviewUrl);
+  const objectUrlRefRef = useRef(objectUrlRef);
 
-  // mantém callback atualizada sem recriar inputs
   useEffect(() => { onPhotoReadyRef.current = onPhotoReady; }, [onPhotoReady]);
 
-  const setPreviewFromFile = (file) => {
-    setFileName(file.name);
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(file);
-    objectUrlRef.current = url;
-    setPreviewUrl(url);
-  };
-
-  // Refs para os inputs reais (criados via DOM, não JSX)
-  const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
-
-  // Cria os inputs UMA VEZ via DOM e anexa ao body. Persiste entre re-renders
-  // porque não fazem parte do React tree. Resolve o bug em que React desmontava
-  // o input entre o click do user e o evento change do file picker.
-  useEffect(() => {
-    const handleFileSelect = (e) => {
-      const file = e.target.files?.[0];
-      e.target.value = ''; // permite re-selecionar mesmo arquivo
-      if (!file) {
-        console.log('[FotoMembro] sem arquivo (cancelou)');
-        return;
-      }
-      console.log('[FotoMembro] arquivo selecionado:', file.name, file.type, file.size);
-      const isImage = (file.type && file.type.startsWith('image/'))
-        || VALID_TYPES.includes(file.type)
-        || /\.(heic|heif|jpe?g|png|webp|avif|gif)$/i.test(file.name);
-      if (!isImage) {
-        setLocalError(`Formato não suportado: ${file.type || file.name}`);
-        return;
-      }
-      if (file.size > MAX_SIZE) {
-        setLocalError(`Foto muito grande: ${(file.size / 1024 / 1024).toFixed(1)}MB. Máx 10MB.`);
-        return;
-      }
-      setLocalError('');
-      setPreviewFromFile(file);
-      console.log('[FotoMembro] onPhotoReady chamado');
-      onPhotoReadyRef.current?.(file);
-    };
-
-    const make = (capture = false) => {
-      const inp = document.createElement('input');
-      inp.type = 'file';
-      inp.accept = 'image/*,.heic,.heif';
-      if (capture) inp.setAttribute('capture', 'environment');
-      inp.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.001';
-      inp.addEventListener('change', handleFileSelect);
-      document.body.appendChild(inp);
-      return inp;
-    };
-
-    fileInputRef.current = make(false);
-    cameraInputRef.current = make(true);
-
-    return () => {
-      fileInputRef.current?.removeEventListener('change', handleFileSelect);
-      cameraInputRef.current?.removeEventListener('change', handleFileSelect);
-      fileInputRef.current?.remove();
-      cameraInputRef.current?.remove();
-    };
-  }, []);
-
-  // disable durante upload
-  useEffect(() => {
-    if (fileInputRef.current) fileInputRef.current.disabled = uploading;
-    if (cameraInputRef.current) cameraInputRef.current.disabled = uploading;
-  }, [uploading]);
+  const existingPhotoUrl = membro ? resolveMemberPhotoUrl(membro) : '';
 
   useEffect(() => () => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -105,9 +41,58 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
     onPhotoReadyRef.current?.(null);
   };
 
-  const triggerUpload = (which) => {
-    const ref = which === 'camera' ? cameraInputRef : fileInputRef;
-    ref.current?.click();
+  // Cria input DINAMICAMENTE no momento do click. Vive só durante o ciclo
+  // (até change ou cancel). Imune a re-renders do componente porque está
+  // fora do React tree e tem ciclo curto.
+  const openPicker = (capture) => {
+    if (uploading) return;
+    console.log('[FotoMembro] criando input dinâmico, capture=', capture);
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*,.heic,.heif';
+    if (capture) inp.setAttribute('capture', 'environment');
+    inp.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.001';
+
+    let consumed = false;
+    const cleanup = () => {
+      try { inp.remove(); } catch {}
+    };
+
+    inp.addEventListener('change', (e) => {
+      consumed = true;
+      const file = e.target.files?.[0];
+      console.log('[FotoMembro] change disparou, file=', file?.name);
+      cleanup();
+      if (!file) return;
+
+      const isImage = (file.type && file.type.startsWith('image/'))
+        || VALID_TYPES.includes(file.type)
+        || /\.(heic|heif|jpe?g|png|webp|avif|gif)$/i.test(file.name);
+      if (!isImage) {
+        setLocalErrorRef.current(`Formato não suportado: ${file.type || file.name}`);
+        return;
+      }
+      if (file.size > MAX_SIZE) {
+        setLocalErrorRef.current(`Foto muito grande: ${(file.size / 1024 / 1024).toFixed(1)}MB. Máx 10MB.`);
+        return;
+      }
+      setLocalErrorRef.current('');
+      setFileNameRef.current(file.name);
+      if (objectUrlRefRef.current.current) URL.revokeObjectURL(objectUrlRefRef.current.current);
+      const url = URL.createObjectURL(file);
+      objectUrlRefRef.current.current = url;
+      setPreviewUrlRef.current(url);
+      console.log('[FotoMembro] onPhotoReady chamado');
+      onPhotoReadyRef.current?.(file);
+    });
+
+    // se user cancelar (cancel event ou focus volta sem change), limpa em 60s
+    setTimeout(() => { if (!consumed) cleanup(); }, 60000);
+
+    document.body.appendChild(inp);
+    // Click programático IMEDIATAMENTE no mesmo tick do user click
+    // → preserva trusted user gesture
+    inp.click();
   };
 
   const displayError = error || localError;
@@ -140,7 +125,7 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => triggerUpload('file')}
+              onClick={() => openPicker(false)}
               disabled={uploading}
               className="inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
@@ -149,7 +134,7 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
             </button>
             <button
               type="button"
-              onClick={() => triggerUpload('camera')}
+              onClick={() => openPicker(true)}
               disabled={uploading}
               className="inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
             >
