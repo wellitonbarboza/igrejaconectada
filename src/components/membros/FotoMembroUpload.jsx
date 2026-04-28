@@ -28,6 +28,22 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
   }, []);
 
+  // FIX React18 + Portal: listeners React (onChange) nao captam eventos
+  // em inputs renderizados via createPortal para document.body, porque
+  // React 18 anexa delegacao de eventos no root container (#root) e nao
+  // no document. Por isso usamos addEventListener vanilla via ref.
+  useEffect(() => {
+    const file = fileInputRef.current;
+    const cam = cameraInputRef.current;
+    if (!file && !cam) return;
+    file?.addEventListener('change', handleFileSelect);
+    cam?.addEventListener('change', handleFileSelect);
+    return () => {
+      file?.removeEventListener('change', handleFileSelect);
+      cam?.removeEventListener('change', handleFileSelect);
+    };
+  }, []);
+
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -81,9 +97,8 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
         id={fileInputId}
         type="file"
         accept="image/*,.heic,.heif"
-        onChange={handleFileSelect}
         disabled={uploading}
-        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001, pointerEvents: 'none' }}
+        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001 }}
       />
       <input
         ref={cameraInputRef}
@@ -91,9 +106,8 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
         type="file"
         accept="image/*,.heic,.heif"
         capture="environment"
-        onChange={handleFileSelect}
         disabled={uploading}
-        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001, pointerEvents: 'none' }}
+        style={{ position: 'fixed', bottom: 0, left: 0, width: 1, height: 1, opacity: 0.001 }}
       />
     </>,
     document.body
