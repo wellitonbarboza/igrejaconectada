@@ -18,6 +18,10 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
   const objectUrlRef = useRef('');
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  // IDs únicos para evitar colisão se múltiplos componentes renderizarem.
+  const idSuffix = useRef(Math.random().toString(36).slice(2, 9)).current;
+  const fileInputId = `foto-membro-file-${idSuffix}`;
+  const cameraInputId = `foto-membro-camera-${idSuffix}`;
   const existingPhotoUrl = membro ? resolveMemberPhotoUrl(membro) : '';
 
   useEffect(() => () => {
@@ -66,14 +70,6 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
     onPhotoReady(null);
   };
 
-  const triggerUpload = (which) => {
-    // FIX: usa createPortal para renderizar input fora do Radix Dialog.
-    // Sem portal, o pointerDownOutside do Dialog cancela o file picker
-    // quando o user clica "Abrir" — o input é desmontado antes do change.
-    const ref = which === 'camera' ? cameraInputRef : fileInputRef;
-    ref.current?.click();
-  };
-
   const displayError = error || localError;
   const displayedPhoto = previewUrl || existingPhotoUrl;
 
@@ -82,20 +78,22 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
     <>
       <input
         ref={fileInputRef}
+        id={fileInputId}
         type="file"
         accept="image/*,.heic,.heif"
         onChange={handleFileSelect}
         disabled={uploading}
-        style={{ display: 'none' }}
+        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
       />
       <input
         ref={cameraInputRef}
+        id={cameraInputId}
         type="file"
         accept="image/*,.heic,.heif"
         capture="environment"
         onChange={handleFileSelect}
         disabled={uploading}
-        style={{ display: 'none' }}
+        style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
       />
     </>,
     document.body
@@ -127,24 +125,20 @@ export default function FotoMembroUpload({ membro, onPhotoReady, uploading = fal
         )}
         <div className="flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => triggerUpload('file')}
-              disabled={uploading}
-              className="inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            <label
+              htmlFor={fileInputId}
+              className={`inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Upload className="w-4 h-4 mr-2" />
               Carregar Foto
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerUpload('camera')}
-              disabled={uploading}
-              className="inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            </label>
+            <label
+              htmlFor={cameraInputId}
+              className={`inline-flex items-center h-10 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-white text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Camera className="w-4 h-4 mr-2" />
               Câmera
-            </button>
+            </label>
             {uploading && (
               <span className="inline-flex items-center text-sm text-slate-500">
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Enviando...
