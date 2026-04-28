@@ -46,14 +46,26 @@ export default function DetalhesDepartamento() {
     );
   }
 
-  const membrosDoDepartamento = membros.filter((membro) => {
-    const departamentosIds = Array.isArray(membro.departamentos_ids)
-      ? membro.departamentos_ids
-      : membro.departamento_id
-      ? [membro.departamento_id]
-      : [];
-    return departamentosIds.includes(departamento.id);
-  });
+  const isObreirosDept = departamento.slug === 'obreiros';
+  const membrosDoDepartamento = isObreirosDept
+    ? membros.filter((m) => m.obreiro === true)
+    : membros.filter((membro) => {
+        const departamentosIds = Array.isArray(membro.departamentos_ids)
+          ? membro.departamentos_ids
+          : membro.departamento_id
+          ? [membro.departamento_id]
+          : [];
+        return departamentosIds.includes(departamento.id);
+      });
+
+  // Tradução dos cargos para exibição
+  const cargoLabel = (c) => ({
+    cooperador: 'Cooperador',
+    diacono: 'Diácono',
+    presbitero: 'Presbítero',
+    evangelista: 'Evangelista',
+    pastor: 'Pastor',
+  }[c] || c || '');
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
@@ -104,7 +116,12 @@ export default function DetalhesDepartamento() {
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
-            {departamento.descricao && (
+            {isObreirosDept && (
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-900">
+                ⚙️ Departamento auto-gerenciado: a lista é sincronizada automaticamente com os membros marcados como <strong>Obreiro</strong> no cadastro.
+              </div>
+            )}
+            {departamento.descricao && !isObreirosDept && (
               <div>
                 <p className="text-sm text-slate-500">Descrição</p>
                 <p className="text-slate-900">{departamento.descricao}</p>
@@ -133,11 +150,22 @@ export default function DetalhesDepartamento() {
               <div className="grid md:grid-cols-2 gap-3">
                 {membrosDoDepartamento.map((membro) => (
                   <div key={membro.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">{membro.nome_completo?.charAt(0)}</span>
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center overflow-hidden">
+                      {membro.foto_url ? (
+                        <img src={membro.foto_url} alt={membro.nome_completo} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-white font-semibold text-sm">{membro.nome_completo?.charAt(0)}</span>
+                      )}
                     </div>
-                    <div>
-                      <p className="font-medium text-slate-900">{membro.nome_completo}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 truncate">
+                        {membro.nome_completo}
+                        {isObreirosDept && membro.cargo_obreiro && (
+                          <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                            {cargoLabel(membro.cargo_obreiro)}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-sm text-slate-500">{membro.tipo}</p>
                     </div>
                   </div>

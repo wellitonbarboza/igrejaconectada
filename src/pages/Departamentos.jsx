@@ -88,6 +88,11 @@ export default function Departamentos() {
   };
 
   const handleDelete = async (id) => {
+    const dep = departamentos.find((d) => d.id === id);
+    if (dep?.slug) {
+      window.alert('Este departamento é gerenciado automaticamente e não pode ser excluído.');
+      return;
+    }
     if (window.confirm('Tem certeza que deseja excluir este departamento?')) {
       await deleteMutation.mutateAsync(id);
     }
