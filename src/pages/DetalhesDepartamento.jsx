@@ -46,6 +46,7 @@ export default function DetalhesDepartamento() {
     );
   }
 
+  const congregacoesMap = (congregacoes || []).reduce((acc, c) => { acc[c.id] = c.nome; return acc; }, {});
   const isObreirosDept = departamento.slug === 'obreiros';
   const membrosDoDepartamento = isObreirosDept
     ? membros.filter((m) => m.obreiro === true)
@@ -166,7 +167,15 @@ export default function DetalhesDepartamento() {
                           </span>
                         )}
                       </p>
-                      <p className="text-sm text-slate-500">{membro.tipo}</p>
+                      <p className="text-sm text-slate-500">
+                        {membro.tipo}
+                        {membro.congregacao_id && congregacoesMap[membro.congregacao_id] && (
+                          <span className="ml-2 text-slate-400">• {congregacoesMap[membro.congregacao_id]}</span>
+                        )}
+                        {!membro.congregacao_id && membro.congregacao_nome && (
+                          <span className="ml-2 text-slate-400">• {membro.congregacao_nome}</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                 ))}

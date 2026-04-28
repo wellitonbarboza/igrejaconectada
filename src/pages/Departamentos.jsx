@@ -63,8 +63,17 @@ export default function Departamentos() {
   const filteredDepartamentos = departamentos;
   const membrosFiltrados = membros;
 
+  const obreirosCount = useMemo(
+    () => (membrosFiltrados || []).filter((m) => m.obreiro === true).length,
+    [membrosFiltrados]
+  );
   const membrosPorDepartamento = useMemo(() => {
-    return membrosFiltrados.reduce((acc, membro) => {
+    const acc = {};
+    // Departamentos auto-gerenciados
+    (filteredDepartamentos || []).forEach((d) => {
+      if (d.slug === 'obreiros') acc[d.id] = obreirosCount;
+    });
+    return membrosFiltrados.reduce((acc2, membro) => {
       const departamentosIds = Array.isArray(membro.departamentos_ids)
         ? membro.departamentos_ids
         : membro.departamento_id
@@ -72,11 +81,11 @@ export default function Departamentos() {
         : [];
       departamentosIds.forEach((departamentoId) => {
         if (!departamentoId) return;
-        acc[departamentoId] = (acc[departamentoId] || 0) + 1;
+        acc2[departamentoId] = (acc2[departamentoId] || 0) + 1;
       });
-      return acc;
-    }, {});
-  }, [membrosFiltrados]);
+      return acc2;
+    }, acc);
+  }, [membrosFiltrados, filteredDepartamentos, obreirosCount]);
 
   const handleEdit = (departamento) => {
     setDepartamentoSelecionado(departamento);
