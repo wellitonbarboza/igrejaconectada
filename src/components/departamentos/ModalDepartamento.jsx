@@ -232,7 +232,7 @@ export default function ModalDepartamento({ departamento, onClose, membros, user
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um líder..." />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable searchPlaceholder="Digite o nome do membro...">
                   <SelectItem value="">Nenhum líder definido</SelectItem>
                   {membrosDisponiveis.map((membro) => (
                     <SelectItem key={membro.id} value={membro.id}>
