@@ -31,6 +31,7 @@ const defaultForm = {
   descricao: '',
   valor: '',
   data_lancamento: format(new Date(), 'yyyy-MM-dd'),
+  congregacao_id: '',
   membro_id: '',
   forma_pagamento: 'dinheiro',
   observacoes: '',
@@ -51,6 +52,7 @@ export default function TesourariaLancamentos() {
   const [form, setForm] = useState(defaultForm);
   const [search, setSearch] = useState('');
   const [mes, setMes] = useState(format(new Date(), 'yyyy-MM'));
+  const [congregacaoFiltro, setCongregacaoFiltro] = useState('todas');
 
   const { data: lancamentos = [], isLoading } = useQuery({
     queryKey: ['lancamentos', igrejaAtiva?.id],
@@ -63,6 +65,29 @@ export default function TesourariaLancamentos() {
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  const { data: congregacoesRaw = [] } = useQuery({
+    queryKey: ['congregacoes'],
+    queryFn: () => base44.entities.Congregacao.list('nome'),
+    initialData: [],
+  });
+
+  // Congregações da igreja ativa (mantém compatibilidade com bases legadas sem igreja_id)
+  const congregacoes = useMemo(
+    () =>
+      (Array.isArray(congregacoesRaw) ? congregacoesRaw : []).filter(
+        (c) => !igrejaAtiva || !c.igreja_id || c.igreja_id === igrejaAtiva.id
+      ),
+    [congregacoesRaw, igrejaAtiva]
+  );
+
+  const congregacaoNome = useMemo(() => {
+    const map = {};
+    congregacoes.forEach((c) => {
+      map[c.id] = c.nome;
+    });
+    return map;
+  }, [congregacoes]);
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
@@ -87,6 +112,11 @@ export default function TesourariaLancamentos() {
     const list = Array.isArray(lancamentos) ? lancamentos : [];
     return list.filter((l) => {
       if (igrejaAtiva && l.igreja_id && l.igreja_id !== igrejaAtiva.id) return false;
+      if (congregacaoFiltro === 'sede') {
+        if (l.congregacao_id) return false;
+      } else if (congregacaoFiltro !== 'todas') {
+        if (l.congregacao_id !== congregacaoFiltro) return false;
+      }
       if (mes) {
         const m = (l.data_lancamento || '').slice(0, 7);
         if (m !== mes) return false;
@@ -99,7 +129,7 @@ export default function TesourariaLancamentos() {
       }
       return true;
     });
-  }, [lancamentos, mes, search, igrejaAtiva]);
+  }, [lancamentos, mes, search, igrejaAtiva, congregacaoFiltro]);
 
   const totaisPorTipo = useMemo(() => {
     return filtrados.reduce((acc, l) => {
@@ -110,7 +140,13 @@ export default function TesourariaLancamentos() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...defaultForm, data_lancamento: format(new Date(), 'yyyy-MM-dd') });
+    setForm({
+      ...defaultForm,
+      data_lancamento: format(new Date(), 'yyyy-MM-dd'),
+      // Já vincula à congregação filtrada (quando uma específica está selecionada)
+      congregacao_id:
+        congregacaoFiltro !== 'todas' && congregacaoFiltro !== 'sede' ? congregacaoFiltro : '',
+    });
     setShowModal(true);
   };
 
@@ -122,6 +158,7 @@ export default function TesourariaLancamentos() {
       descricao: l.descricao || '',
       valor: l.valor || '',
       data_lancamento: l.data_lancamento || format(new Date(), 'yyyy-MM-dd'),
+      congregacao_id: l.congregacao_id || '',
       membro_id: l.membro_id || '',
       forma_pagamento: l.forma_pagamento || 'dinheiro',
       observacoes: l.observacoes || '',
@@ -141,7 +178,8 @@ export default function TesourariaLancamentos() {
       ...form,
       valor,
       igreja_id: igrejaAtiva?.id || null,
-      congregacao_id: membro?.congregacao_id || null,
+      // Congregação escolhida no formulário tem prioridade; cai para a do membro
+      congregacao_id: form.congregacao_id || membro?.congregacao_id || null,
       membro_id: form.membro_id || null,
       membro_nome: membro?.nome_completo || '',
       responsavel_id: user?.id || null,
@@ -176,22 +214,38 @@ export default function TesourariaLancamentos() {
             <CardTitle>Filtros</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  placeholder="Buscar por membro ou descrição"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
+                <Label className="text-xs">Buscar</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="Membro ou descrição"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Congregação</Label>
+                <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
+                  <SelectTrigger><SelectValue placeholder="Congregação" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as congregações</SelectItem>
+                    <SelectItem value="sede">Sede (sem congregação)</SelectItem>
+                    {congregacoes.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Mês/Ano</Label>
                 <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
               </div>
               <div className="flex items-end">
-                <Button variant="outline" onClick={() => { setSearch(''); setMes(format(new Date(), 'yyyy-MM')); }}>
+                <Button variant="outline" onClick={() => { setSearch(''); setMes(format(new Date(), 'yyyy-MM')); setCongregacaoFiltro('todas'); }}>
                   Limpar
                 </Button>
               </div>
@@ -222,6 +276,7 @@ export default function TesourariaLancamentos() {
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Congregação</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Membro</TableHead>
                     <TableHead>Valor</TableHead>
@@ -233,6 +288,7 @@ export default function TesourariaLancamentos() {
                     <TableRow key={l.id}>
                       <TableCell>{l.data_lancamento ? format(new Date(`${l.data_lancamento}T00:00:00`), 'dd/MM/yyyy') : '-'}</TableCell>
                       <TableCell><Badge className={tipoColor(l.tipo)}>{tipoLabel(l.tipo)}</Badge></TableCell>
+                      <TableCell>{l.congregacao_id ? (congregacaoNome[l.congregacao_id] || '—') : 'Sede'}</TableCell>
                       <TableCell className="max-w-xs truncate">{l.descricao || '-'}</TableCell>
                       <TableCell>{l.membro_nome || '—'}</TableCell>
                       <TableCell className="font-semibold">{formatCurrency(l.valor)}</TableCell>
@@ -280,6 +336,21 @@ export default function TesourariaLancamentos() {
               <Label>Data *</Label>
               <Input type="date" value={form.data_lancamento} onChange={(e) => setForm({ ...form, data_lancamento: e.target.value })} required />
             </div>
+            <div className="md:col-span-2">
+              <Label>Congregação</Label>
+              <Select value={form.congregacao_id || 'sede'} onValueChange={(v) => setForm({ ...form, congregacao_id: v === 'sede' ? '' : v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione a congregação" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sede">Sede (sem congregação)</SelectItem>
+                  {congregacoes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 mt-1">
+                O lançamento ficará vinculado a esta congregação dentro da igreja selecionada.
+              </p>
+            </div>
             <div>
               <Label>Valor (R$) *</Label>
               <Input type="number" step="0.01" min="0" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} required />
@@ -300,7 +371,15 @@ export default function TesourariaLancamentos() {
             {(form.tipo === 'dizimo' || form.tipo === 'oferta' || form.tipo === 'voto') && (
               <div className="md:col-span-2">
                 <Label>Membro (dizimista / ofertante)</Label>
-                <Select value={form.membro_id || ''} onValueChange={(v) => setForm({ ...form, membro_id: v })}>
+                <Select value={form.membro_id || ''} onValueChange={(v) => {
+                  const m = membros.find((mm) => mm.id === v);
+                  setForm((prev) => ({
+                    ...prev,
+                    membro_id: v,
+                    // Ao escolher um membro, herda a congregação dele caso ainda não definida
+                    congregacao_id: prev.congregacao_id || m?.congregacao_id || '',
+                  }));
+                }}>
                   <SelectTrigger><SelectValue placeholder="Selecione um membro" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Sem vínculo</SelectItem>
