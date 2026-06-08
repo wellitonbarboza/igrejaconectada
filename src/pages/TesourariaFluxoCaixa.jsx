@@ -5,6 +5,7 @@ import { Wallet, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { useChurch } from '@/context/ChurchContext.jsx';
 
@@ -20,6 +21,7 @@ export default function TesourariaFluxoCaixa() {
   const hoje = new Date();
   const [inicio, setInicio] = useState(format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd'));
   const [fim, setFim] = useState(format(hoje, 'yyyy-MM-dd'));
+  const [congregacaoFiltro, setCongregacaoFiltro] = useState('todas');
 
   const { data: lancamentos = [] } = useQuery({
     queryKey: ['lancamentos', igrejaAtiva?.id],
@@ -27,13 +29,32 @@ export default function TesourariaFluxoCaixa() {
     initialData: [],
   });
 
+  const { data: congregacoesRaw = [] } = useQuery({
+    queryKey: ['congregacoes'],
+    queryFn: () => base44.entities.Congregacao.list('nome'),
+    initialData: [],
+  });
+
+  const congregacoes = useMemo(
+    () =>
+      (Array.isArray(congregacoesRaw) ? congregacoesRaw : []).filter(
+        (c) => !igrejaAtiva || !c.igreja_id || c.igreja_id === igrejaAtiva.id
+      ),
+    [congregacoesRaw, igrejaAtiva]
+  );
+
   const filtrados = useMemo(() => {
     return (Array.isArray(lancamentos) ? lancamentos : []).filter((l) => {
       if (igrejaAtiva && l.igreja_id && l.igreja_id !== igrejaAtiva.id) return false;
+      if (congregacaoFiltro === 'sede') {
+        if (l.congregacao_id) return false;
+      } else if (congregacaoFiltro !== 'todas') {
+        if (l.congregacao_id !== congregacaoFiltro) return false;
+      }
       if (!l.data_lancamento) return false;
       return l.data_lancamento >= inicio && l.data_lancamento <= fim;
     });
-  }, [lancamentos, inicio, fim, igrejaAtiva]);
+  }, [lancamentos, inicio, fim, igrejaAtiva, congregacaoFiltro]);
 
   const totalEntradas = filtrados
     .filter((l) => ENTRADAS.includes(l.tipo))
@@ -71,7 +92,7 @@ export default function TesourariaFluxoCaixa() {
         <Card className="shadow-lg border-0">
           <CardHeader><CardTitle>Período</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid md:grid-cols-3 gap-3">
               <div>
                 <Label>De</Label>
                 <Input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} />
@@ -79,6 +100,19 @@ export default function TesourariaFluxoCaixa() {
               <div>
                 <Label>Até</Label>
                 <Input type="date" value={fim} onChange={(e) => setFim(e.target.value)} />
+              </div>
+              <div>
+                <Label>Congregação</Label>
+                <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
+                  <SelectTrigger><SelectValue placeholder="Congregação" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as congregações</SelectItem>
+                    <SelectItem value="sede">Sede (sem congregação)</SelectItem>
+                    {congregacoes.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>

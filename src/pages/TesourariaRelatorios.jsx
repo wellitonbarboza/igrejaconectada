@@ -23,6 +23,7 @@ export default function TesourariaRelatorios() {
   const { igrejaAtiva } = useChurch();
   const [mes, setMes] = useState(format(new Date(), 'yyyy-MM'));
   const [relatorio, setRelatorio] = useState('entradas_saidas'); // entradas_saidas | dizimistas
+  const [congregacaoFiltro, setCongregacaoFiltro] = useState('todas');
 
   const { data: lancamentos = [] } = useQuery({
     queryKey: ['lancamentos', igrejaAtiva?.id],
@@ -30,13 +31,47 @@ export default function TesourariaRelatorios() {
     initialData: [],
   });
 
+  const { data: congregacoesRaw = [] } = useQuery({
+    queryKey: ['congregacoes'],
+    queryFn: () => base44.entities.Congregacao.list('nome'),
+    initialData: [],
+  });
+
+  const congregacoes = useMemo(
+    () =>
+      (Array.isArray(congregacoesRaw) ? congregacoesRaw : []).filter(
+        (c) => !igrejaAtiva || !c.igreja_id || c.igreja_id === igrejaAtiva.id
+      ),
+    [congregacoesRaw, igrejaAtiva]
+  );
+
+  const congregacaoNome = useMemo(() => {
+    const map = {};
+    congregacoes.forEach((c) => {
+      map[c.id] = c.nome;
+    });
+    return map;
+  }, [congregacoes]);
+
   const filtrados = useMemo(() => {
     return (Array.isArray(lancamentos) ? lancamentos : []).filter((l) => {
       if (igrejaAtiva && l.igreja_id && l.igreja_id !== igrejaAtiva.id) return false;
+      if (congregacaoFiltro === 'sede') {
+        if (l.congregacao_id) return false;
+      } else if (congregacaoFiltro !== 'todas') {
+        if (l.congregacao_id !== congregacaoFiltro) return false;
+      }
       if (!l.data_lancamento) return false;
       return (l.data_lancamento || '').slice(0, 7) === mes;
     });
-  }, [lancamentos, mes, igrejaAtiva]);
+  }, [lancamentos, mes, igrejaAtiva, congregacaoFiltro]);
+
+  const congregacaoLabel =
+    congregacaoFiltro === 'todas'
+      ? 'Todas as congregações'
+      : congregacaoFiltro === 'sede'
+      ? 'Sede (sem congregação)'
+      : congregacaoNome[congregacaoFiltro] || 'Congregação';
 
   const entradas = filtrados.filter((l) => ENTRADAS.includes(l.tipo));
   const saidas = filtrados.filter((l) => SAIDAS.includes(l.tipo));
@@ -53,13 +88,14 @@ export default function TesourariaRelatorios() {
         if (!map[key]) {
           map[key] = {
             nome: l.membro_nome || 'Sem identificação',
+            congregacao: l.congregacao_id ? (congregacaoNome[l.congregacao_id] || '—') : 'Sede',
             qtde: 0,
           };
         }
         map[key].qtde += 1;
       });
     return Object.values(map).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [filtrados]);
+  }, [filtrados, congregacaoNome]);
 
   const mesLabel = mes ? format(new Date(`${mes}-01T00:00:00`), "MMMM 'de' yyyy", { locale: ptBR }) : '';
 
@@ -84,7 +120,7 @@ export default function TesourariaRelatorios() {
         <Card className="shadow-lg border-0 print:shadow-none">
           <CardHeader><CardTitle>Filtros</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid md:grid-cols-3 gap-3">
               <div>
                 <Label>Tipo de relatório</Label>
                 <Select value={relatorio} onValueChange={setRelatorio}>
@@ -92,6 +128,19 @@ export default function TesourariaRelatorios() {
                   <SelectContent>
                     <SelectItem value="entradas_saidas">Entradas e Saídas</SelectItem>
                     <SelectItem value="dizimistas">Dizimistas do mês (sem valores)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Congregação</Label>
+                <Select value={congregacaoFiltro} onValueChange={setCongregacaoFiltro}>
+                  <SelectTrigger><SelectValue placeholder="Congregação" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as congregações</SelectItem>
+                    <SelectItem value="sede">Sede (sem congregação)</SelectItem>
+                    {congregacoes.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -108,6 +157,7 @@ export default function TesourariaRelatorios() {
             <Card className="shadow-lg border-0">
               <CardHeader>
                 <CardTitle>Resumo · {mesLabel}</CardTitle>
+                <p className="text-xs text-slate-500 mt-1">{congregacaoLabel}</p>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -139,7 +189,7 @@ export default function TesourariaRelatorios() {
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b bg-slate-50 text-left">
-                          <th className="p-2">Data</th><th className="p-2">Tipo</th><th className="p-2">Descrição</th><th className="p-2 text-right">Valor</th>
+                          <th className="p-2">Data</th><th className="p-2">Tipo</th><th className="p-2">Congregação</th><th className="p-2">Descrição</th><th className="p-2 text-right">Valor</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -147,6 +197,7 @@ export default function TesourariaRelatorios() {
                           <tr key={l.id} className="border-b">
                             <td className="p-2">{format(new Date(`${l.data_lancamento}T00:00:00`), 'dd/MM')}</td>
                             <td className="p-2 capitalize">{l.tipo}</td>
+                            <td className="p-2">{l.congregacao_id ? (congregacaoNome[l.congregacao_id] || '—') : 'Sede'}</td>
                             <td className="p-2">{l.descricao || l.membro_nome || '-'}</td>
                             <td className="p-2 text-right font-medium">{money(l.valor)}</td>
                           </tr>
@@ -166,7 +217,7 @@ export default function TesourariaRelatorios() {
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b bg-slate-50 text-left">
-                          <th className="p-2">Data</th><th className="p-2">Tipo</th><th className="p-2">Descrição</th><th className="p-2 text-right">Valor</th>
+                          <th className="p-2">Data</th><th className="p-2">Tipo</th><th className="p-2">Congregação</th><th className="p-2">Descrição</th><th className="p-2 text-right">Valor</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -174,6 +225,7 @@ export default function TesourariaRelatorios() {
                           <tr key={l.id} className="border-b">
                             <td className="p-2">{format(new Date(`${l.data_lancamento}T00:00:00`), 'dd/MM')}</td>
                             <td className="p-2 capitalize">{l.tipo}</td>
+                            <td className="p-2">{l.congregacao_id ? (congregacaoNome[l.congregacao_id] || '—') : 'Sede'}</td>
                             <td className="p-2">{l.descricao || '-'}</td>
                             <td className="p-2 text-right font-medium">{money(l.valor)}</td>
                           </tr>
@@ -197,6 +249,7 @@ export default function TesourariaRelatorios() {
               <p className="text-xs text-slate-500 mt-1">
                 Este relatório lista apenas quem dizimou no mês, sem expor valores individuais.
               </p>
+              <p className="text-xs text-slate-500">{congregacaoLabel}</p>
             </CardHeader>
             <CardContent>
               {dizimistas.length === 0 ? (
@@ -205,7 +258,10 @@ export default function TesourariaRelatorios() {
                 <div className="grid md:grid-cols-2 gap-2">
                   {dizimistas.map((d, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-slate-200">
-                      <span className="font-medium text-slate-900">{d.nome}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-slate-900">{d.nome}</span>
+                        <span className="text-xs text-slate-500">{d.congregacao}</span>
+                      </div>
                       <Badge variant="secondary" className="bg-blue-50 text-blue-700">{d.qtde} contribuição{d.qtde > 1 ? 'es' : ''}</Badge>
                     </div>
                   ))}
