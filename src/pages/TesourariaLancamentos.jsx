@@ -318,11 +318,12 @@ export default function TesourariaLancamentos() {
       </div>
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl flex flex-col">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto min-h-0 flex-1">
             <div>
               <Label>Tipo *</Label>
               <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
@@ -381,7 +382,7 @@ export default function TesourariaLancamentos() {
                   }));
                 }}>
                   <SelectTrigger><SelectValue placeholder="Selecione um membro" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent searchable searchPlaceholder="Digite o nome do membro...">
                     <SelectItem value="">Sem vínculo</SelectItem>
                     {membros.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
@@ -403,7 +404,8 @@ export default function TesourariaLancamentos() {
               <Label>Observações</Label>
               <Textarea rows={3} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
             </div>
-            <div className="md:col-span-2 flex justify-end gap-2 pt-2">
+            </div>
+            <div className="shrink-0 border-t bg-white px-6 py-4 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
               <Button type="submit" disabled={saveMutation.isPending} className="bg-gradient-to-r from-green-500 to-blue-600">
                 {saveMutation.isPending ? 'Salvando...' : 'Salvar'}

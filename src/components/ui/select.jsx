@@ -116,9 +116,32 @@ export function SelectValue({ placeholder = 'Selecione...' }) {
   return <span className="text-slate-400">{placeholder}</span>;
 }
 
-export function SelectContent({ className, children }) {
+export function SelectContent({ className, children, searchable = false, searchPlaceholder = 'Buscar...' }) {
   const { open, disabled } = useContext(SelectContext);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
+
   if (!open || disabled) return null;
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const allChildren = React.Children.toArray(children);
+  const filteredChildren =
+    !searchable || !normalizedQuery
+      ? allChildren
+      : allChildren.filter((child) => {
+          // Mantém wrappers/itens que não sejam SelectItem; filtra SelectItem pelo texto
+          if (!React.isValidElement(child) || child.type !== SelectItem) return true;
+          const text = getTextFromChildren(child.props.children).toLowerCase();
+          return text.includes(normalizedQuery);
+        });
+
+  const hasResults = filteredChildren.some(
+    (child) => React.isValidElement(child) && child.type === SelectItem
+  );
+
   return (
     <div
       className={clsx(
@@ -126,7 +149,26 @@ export function SelectContent({ className, children }) {
         className
       )}
     >
-      <div className="max-h-72 overflow-y-auto">{children}</div>
+      {searchable && (
+        <div className="p-1">
+          <input
+            autoFocus
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder={searchPlaceholder}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
+      <div className="max-h-72 overflow-y-auto">
+        {filteredChildren}
+        {searchable && !hasResults && (
+          <p className="px-3 py-2 text-sm text-slate-400 text-center">Nenhum resultado encontrado</p>
+        )}
+      </div>
     </div>
   );
 }
