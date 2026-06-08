@@ -203,7 +203,7 @@ export default function EbdClasses() {
               <Label>Professor</Label>
               <Select value={form.professor_id || ''} onValueChange={(v) => setForm({ ...form, professor_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione um membro" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent searchable searchPlaceholder="Digite o nome do membro...">
                   <SelectItem value="">Sem professor definido</SelectItem>
                   {membros.map((m) => (
                     <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
