@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import usePermissions from '@/hooks/usePermissions';
 import { useChurch } from '@/context/ChurchContext.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 const TIPOS = [
   { value: 'dizimo', label: 'Dízimo', color: 'bg-blue-100 text-blue-700' },
@@ -60,11 +61,17 @@ export default function TesourariaLancamentos() {
     initialData: [],
   });
 
-  const { data: membros = [] } = useQuery({
+  const { data: membrosTodos = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  const membros = React.useMemo(
+    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    [membrosTodos]
+  );
 
   const { data: congregacoesRaw = [] } = useQuery({
     queryKey: ['congregacoes'],

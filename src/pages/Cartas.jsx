@@ -21,6 +21,7 @@ import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
 import ChurchLogo from '@/components/ChurchLogo.jsx';
 import usePermissions from '@/hooks/usePermissions';
 import { useChurch } from '@/context/ChurchContext.jsx';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function Cartas() {
   const { user } = useAuth();
@@ -44,11 +45,17 @@ export default function Cartas() {
   const isAdmin = user?.role === 'admin';
   const perms = usePermissions('Cartas');
 
-  const { data: membros = [] } = useQuery({
+  const { data: membrosTodos = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  const membros = React.useMemo(
+    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    [membrosTodos]
+  );
 
   const { data: cartasEmitidas = [] } = useQuery({
     queryKey: ['cartas-emitidas'],

@@ -16,6 +16,7 @@ import {
 import ModalDepartamento from '@/components/departamentos/ModalDepartamento.jsx';
 import { useAuth } from '@/context/AuthContext.jsx';
 import usePermissions from '@/hooks/usePermissions';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function Departamentos() {
   const navigate = useNavigate();
@@ -34,11 +35,17 @@ export default function Departamentos() {
     initialData: [],
   });
 
-  const { data: membros = [] } = useQuery({
+  const { data: membrosTodos = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  const membros = React.useMemo(
+    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    [membrosTodos]
+  );
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Departamento.delete(id),

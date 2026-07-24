@@ -13,6 +13,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
 import usePermissions from '@/hooks/usePermissions';
 import appLogo from '@/assets/church-logo.svg';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function Dashboard() {
   const { user } = useAuth();

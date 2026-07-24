@@ -24,6 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
 import AtaModal from '@/components/relatorios/AtaModal.jsx';
 import { FileText as FileTextIcon, Eye } from 'lucide-react';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function Relatorios() {
   const { user } = useAuth();
@@ -34,11 +35,17 @@ export default function Relatorios() {
 
   const isAdmin = user?.role === 'admin';
 
-  const { data: membros = [] } = useQuery({
+  const { data: membrosTodos = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  const membros = React.useMemo(
+    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    [membrosTodos]
+  );
 
   const { data: departamentos = [] } = useQuery({
     queryKey: ['departamentos'],
