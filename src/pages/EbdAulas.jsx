@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { format } from 'date-fns';
 import usePermissions from '@/hooks/usePermissions';
 import { useChurch } from '@/context/ChurchContext.jsx';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function EbdAulas() {
   const { igrejaAtiva } = useChurch();
@@ -50,11 +51,17 @@ export default function EbdAulas() {
     initialData: [],
   });
 
-  const { data: membros = [] } = useQuery({
+  const { data: membrosTodos = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  const membros = React.useMemo(
+    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    [membrosTodos]
+  );
 
   const { data: aulas = [] } = useQuery({
     queryKey: ['ebd_aulas', igrejaAtiva?.id],

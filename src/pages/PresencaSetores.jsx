@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { useChurch } from '@/context/ChurchContext.jsx';
 import usePermissions from '@/hooks/usePermissions';
+import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function PresencaSetores() {
   const { user } = useAuth();
@@ -38,11 +39,17 @@ export default function PresencaSetores() {
     initialData: [],
   });
 
-  const { data: membros = [] } = useQuery({
+  const { data: membrosTodos = [] } = useQuery({
     queryKey: ['membros'],
     queryFn: () => base44.entities.Membro.list('nome_completo'),
     initialData: [],
   });
+
+  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  const membros = React.useMemo(
+    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    [membrosTodos]
+  );
 
   const { data: reunioes = [] } = useQuery({
     queryKey: ['setor_reunioes', igrejaAtiva?.id],
