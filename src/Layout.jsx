@@ -75,6 +75,15 @@ export default function Layout({ children }) {
         { title: 'Cartas', url: createPageUrl('Cartas'), icon: Mail, page: 'Cartas' },
         { title: 'Cartões', url: createPageUrl('Cartoes'), icon: CreditCard, page: 'Cartoes' },
       ],
+      subgroups: [
+        {
+          label: 'Cultos',
+          items: [
+            { title: 'Presença', url: createPageUrl('PresencaCultos'), icon: CalendarCheck, page: 'PresencaCultos' },
+            { title: 'Relatórios', url: createPageUrl('CultosRelatorios'), icon: BarChart3, page: 'CultosRelatorios' },
+          ],
+        },
+      ],
     },
     {
       label: 'Tesouraria',
@@ -130,13 +139,19 @@ export default function Layout({ children }) {
       }
       // Quando o módulo não está ativo para a igreja (exceto super admin), esconde o grupo.
       const moduloLiberado = group.modulo === null || superAdmin || isModuloAtivo(modulosAtivos, group.modulo);
-      if (!moduloLiberado) return { ...group, items: [] };
+      if (!moduloLiberado) return { ...group, items: [], subgroups: [] };
       const items = group.items.filter((item) => hasPageAccess(user, item.page));
-      return { ...group, items };
+      const subgroups = (group.subgroups || [])
+        .map((sub) => ({ ...sub, items: sub.items.filter((item) => hasPageAccess(user, item.page)) }))
+        .filter((sub) => sub.items.length > 0);
+      return { ...group, items, subgroups };
     })
-    .filter((group) => group.items.length > 0);
+    .filter((group) => group.items.length > 0 || (group.subgroups && group.subgroups.length > 0));
 
-  const totalVisiblePages = visibleGroups.reduce((sum, g) => sum + g.items.length, 0);
+  const totalVisiblePages = visibleGroups.reduce(
+    (sum, g) => sum + g.items.length + (g.subgroups || []).reduce((s, sub) => s + sub.items.length, 0),
+    0
+  );
 
   return (
     <SidebarProvider>
@@ -204,6 +219,33 @@ export default function Layout({ children }) {
                       </SidebarMenuItem>
                     ))}
                   </SidebarMenu>
+
+                  {(group.subgroups || []).map((sub) => (
+                    <div key={sub.label} className="mt-2 ml-2 pl-2 border-l border-slate-200">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] px-3 py-1.5">
+                        {sub.label}
+                      </p>
+                      <SidebarMenu>
+                        {sub.items.map((item) => (
+                          <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                              asChild
+                              className={`hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200 rounded-lg mb-1 ${
+                                location.pathname === item.url
+                                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white hover:from-blue-500 hover:to-purple-600 shadow-indigo'
+                                  : ''
+                              }`}
+                            >
+                              <Link to={item.url} className="flex items-center gap-3 px-3 py-2.5">
+                                <item.icon className="w-5 h-5" />
+                                <span className="font-medium">{item.title}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </div>
+                  ))}
                 </SidebarGroupContent>
               </SidebarGroup>
             ))}

@@ -40,6 +40,8 @@ export const ALL_MANAGEABLE_PAGES = [
   { page: 'Relatorios', label: 'Relatórios', actions: ['view'], modulo: 'secretaria' },
   { page: 'Cartoes', label: 'Cartões', actions: ['view'], modulo: 'secretaria' },
   { page: 'Cartas', label: 'Cartas', actions: ['view', 'create', 'edit', 'delete'], modulo: 'secretaria' },
+  { page: 'PresencaCultos', label: 'Cultos · Presença', actions: ['view', 'create', 'edit', 'delete'], modulo: 'secretaria' },
+  { page: 'CultosRelatorios', label: 'Cultos · Relatórios', actions: ['view'], modulo: 'secretaria' },
   // Tesouraria
   { page: 'TesourariaLancamentos', label: 'Tesouraria · Lançamentos', actions: ['view', 'create', 'edit', 'delete'], modulo: 'tesouraria' },
   { page: 'TesourariaFluxoCaixa', label: 'Tesouraria · Fluxo de Caixa', actions: ['view'], modulo: 'tesouraria' },
@@ -74,6 +76,8 @@ const DEFAULT_USUARIO_PERMISSIONS = {
   Relatorios: ['view'],
   Cartoes: ['view'],
   Cartas: ['view'],
+  PresencaCultos: ['view', 'create', 'edit'],
+  CultosRelatorios: ['view'],
   Download: ['view'],
 };
 
