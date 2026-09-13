@@ -603,6 +603,8 @@ export const base44 = {
     EbdFinanceiro: createEntityClient('ebd_financeiro'),
     SetorReuniao: createEntityClient('setor_reunioes'),
     SetorPresenca: createEntityClient('setor_presencas'),
+    Culto: createEntityClient('cultos'),
+    CultoPresenca: createEntityClient('culto_presencas'),
   },
   integrations: {
     Core: {

@@ -26,6 +26,8 @@ import EbdAulas from '@/pages/EbdAulas.jsx';
 import EbdCaixa from '@/pages/EbdCaixa.jsx';
 import EbdRelatorios from '@/pages/EbdRelatorios.jsx';
 import PresencaSetores from '@/pages/PresencaSetores.jsx';
+import PresencaCultos from '@/pages/PresencaCultos.jsx';
+import CultosRelatorios from '@/pages/CultosRelatorios.jsx';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { hasPageAccess } from '@/utils/accessControl';
@@ -109,6 +111,8 @@ export default function App() {
         <Route path={createPageUrl('EbdCaixa')} element={<ProtectedRoute page="EbdCaixa"><EbdCaixa /></ProtectedRoute>} />
         <Route path={createPageUrl('EbdRelatorios')} element={<ProtectedRoute page="EbdRelatorios"><EbdRelatorios /></ProtectedRoute>} />
         <Route path={createPageUrl('PresencaSetores')} element={<ProtectedRoute page="PresencaSetores"><PresencaSetores /></ProtectedRoute>} />
+        <Route path={createPageUrl('PresencaCultos')} element={<ProtectedRoute page="PresencaCultos"><PresencaCultos /></ProtectedRoute>} />
+        <Route path={createPageUrl('CultosRelatorios')} element={<ProtectedRoute page="CultosRelatorios"><CultosRelatorios /></ProtectedRoute>} />
         <Route path={createPageUrl('Download')} element={<Navigate to={`${createPageUrl('Download')}/mobile`} replace />} />
         <Route path={`${createPageUrl('Download')}/:platform`} element={<ProtectedRoute page="Download"><Download /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={createPageUrl('Dashboard')} replace />} />
