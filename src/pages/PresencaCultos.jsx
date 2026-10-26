@@ -19,6 +19,9 @@ import { isArchivedMember } from '@/utils/memberStatus';
 
 export const TIPOS_CULTO = [
   { value: 'culto_domingo', label: 'Culto de Domingo' },
+  { value: 'culto_terca', label: 'Culto de Terça-feira' },
+  { value: 'culto_quinta', label: 'Culto de Quinta-feira' },
+  { value: 'culto_sabado', label: 'Culto de Sábado' },
   { value: 'escola_dominical', label: 'Escola Dominical' },
   { value: 'oracao', label: 'Culto de Oração' },
   { value: 'ensino', label: 'Culto de Ensino / Doutrina' },
