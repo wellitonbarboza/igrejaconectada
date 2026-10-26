@@ -1,16 +1,15 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { CreditCard, Search, Download, Calendar, Hash } from 'lucide-react';
+import { CreditCard, Search, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
-import ChurchLogo from '@/components/ChurchLogo.jsx';
+import { CartaoFrente, CartaoVerso, CARTAO_CSS, categoriaCartao, elegivelCartao, formatMatricula } from '@/components/cartoes/CartaoMembro.jsx';
 import { useChurch } from '@/context/ChurchContext.jsx';
 import { isArchivedMember } from '@/utils/memberStatus';
 
@@ -32,16 +31,24 @@ export default function Cartoes() {
     initialData: [],
   });
 
-  // membros filtra fora arquivados (inativo/transferido) — mostrar arquivados só em ArquivoMorto
+  // Cartão só para membros ou obreiros, fora do arquivo morto (inativo/transferido).
+  // Congregados, crianças e visitantes sem cargo de obreiro não recebem cartão.
   const membros = React.useMemo(
-    () => (membrosTodos || []).filter((m) => !isArchivedMember(m)),
+    () => (membrosTodos || []).filter(
+      (m) => elegivelCartao(m) && !isArchivedMember(m)
+    ),
     [membrosTodos]
   );
 
   const filteredMembros = useMemo(() => (
-    membros.filter(
-      (m) => m.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    membros.filter((m) => {
+      const termo = searchTerm.trim().toLowerCase();
+      if (!termo) return true;
+      return (
+        m.nome_completo?.toLowerCase().includes(termo) ||
+        formatMatricula(m.matricula).includes(termo)
+      );
+    })
   ), [membros, searchTerm]);
 
   const toggleMembro = (membroId) => {
@@ -71,48 +78,24 @@ export default function Cartoes() {
   };
 
   const CartaoMembro = ({ membro }) => (
-    <div className="w-[350px] h-[220px] bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl p-6 text-white relative overflow-hidden print:break-inside-avoid print:mb-4">
-      <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-5 rounded-full -mr-20 -mt-20" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16" />
-
-      <div className="relative z-10 h-full flex flex-col">
-        <div className="flex items-center gap-2 mb-4">
-          <ChurchLogo className="w-6 h-6 rounded bg-white p-0.5" alt={`Logo ${nomeIgreja}`} />
-          <div>
-            <p className="font-bold text-lg truncate max-w-[260px]">{nomeIgreja}</p>
-            <p className="text-xs opacity-80">Cartão de Membro</p>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center gap-4">
-          <MemberAvatar membro={membro} sizeClass="w-16 h-16" textClass="text-2xl" className="border-2 border-white" />
-          <div className="flex-1">
-            <p className="font-bold text-xl mb-1">{membro.nome_completo}</p>
-            <Badge className="bg-white text-blue-600 text-xs">{membro.tipo}</Badge>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs mt-auto">
-          <div className="col-span-2 opacity-90 truncate">Congregação: {membro.congregacao_nome || '-'}</div>
-          <div className="flex items-center gap-2">
-            <Hash className="w-3 h-3" />
-            <span className="opacity-80">ID: {String(membro.id).slice(-6)}</span>
-          </div>
-          {membro.data_membresia && (
-            <div className="flex items-center gap-2">
-              <Calendar className="w-3 h-3" />
-              <span className="opacity-80">
-                Desde {format(new Date(`${membro.data_membresia}T00:00:00`), 'MM/yyyy')}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="cm-pair">
+      <CartaoFrente membro={membro} config={config} nomeIgreja={nomeIgreja} />
+      <CartaoVerso membro={membro} config={config} />
     </div>
   );
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
+      <style>{`${CARTAO_CSS}
+        .cm-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:1.25rem}
+        .cm-list{display:grid;gap:2rem}
+        @media print{
+          .cm-pair{grid-template-columns:85.6mm 85.6mm;gap:6mm}
+          .cm-list{gap:6mm}
+          .cm-card{width:85.6mm;box-shadow:none}
+          .cm-print-group{break-inside:avoid}
+        }
+      `}</style>
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
           <div>
@@ -120,7 +103,7 @@ export default function Cartoes() {
               <CreditCard className="w-8 h-8 text-blue-600" />
               Cartões de Membros
             </h1>
-            <p className="text-slate-500 mt-1">Selecione os membros para gerar cartões de identificação</p>
+            <p className="text-slate-500 mt-1">Selecione os membros para gerar o cartão (frente e verso). Apenas membros e obreiros ativos.</p>
           </div>
           <div className="flex flex-wrap gap-2">
           <Button
@@ -150,7 +133,7 @@ export default function Cartoes() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar membro..."
+                  placeholder="Buscar por nome ou matrícula..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -172,10 +155,10 @@ export default function Cartoes() {
                     <MemberAvatar membro={membro} />
                     <div className="flex-1">
                       <p className="font-semibold text-slate-900">{membro.nome_completo}</p>
-                      <p className="text-sm text-slate-500">{membro.congregacao_nome}</p>
+                      <p className="text-sm text-slate-500">Matrícula {formatMatricula(membro.matricula)}</p>
                     </div>
                     <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                      {membro.tipo}
+                      {categoriaCartao(membro)}
                     </Badge>
                   </label>
                 ))}
@@ -202,7 +185,7 @@ export default function Cartoes() {
                 }
               }
             `}</style>
-              <div className="print-area grid grid-cols-2 gap-6" ref={cartoesPrintRef}>
+              <div className="print-area cm-list" ref={cartoesPrintRef}>
                 {membrosParaImprimir.map((membro) => (
                   <CartaoMembro key={membro.id} membro={membro} />
                 ))}
@@ -216,7 +199,7 @@ export default function Cartoes() {
               <CardTitle>Pré-visualização</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid md:grid-cols-2 gap-6" ref={cartoesPreviewRef}>
+              <div className="cm-list" ref={cartoesPreviewRef}>
                 {membrosParaImprimir.map((membro) => (
                   <CartaoMembro key={membro.id} membro={membro} />
                 ))}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44, STORAGE_BUCKETS } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Save, Upload, Church, Image as ImageIcon } from 'lucide-react';
+import { Settings, Save, Upload, Church, Image as ImageIcon, PenLine, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,11 +25,15 @@ const DEFAULT_FORM = {
   logo_url: '',
   logo_path: '',
   logo_bucket: '',
+  assinatura_url: '',
+  assinatura_path: '',
+  assinatura_bucket: '',
 };
 
 export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
+  const [uploadingAssinatura, setUploadingAssinatura] = useState(false);
   const perms = usePermissions('Configuracoes');
   const { igrejaAtiva, refresh: refreshChurchContext } = useChurch();
 
@@ -83,6 +87,9 @@ export default function Configuracoes() {
       'logo_url',
       'logo_path',
       'logo_bucket',
+      'assinatura_url',
+      'assinatura_path',
+      'assinatura_bucket',
     ];
     const payload = { ...data };
     optionalFields.forEach((field) => {
@@ -148,6 +155,46 @@ export default function Configuracoes() {
     }
     setUploading(false);
   };
+
+  const handleAssinaturaUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      alert('Envie a assinatura em PNG, JPG ou WEBP. PNG com fundo transparente fica melhor no cartão.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A imagem da assinatura deve ter no máximo 2 MB.');
+      return;
+    }
+
+    setUploadingAssinatura(true);
+    try {
+      const igrejaSlug = igrejaAtiva?.id ? `igreja-${igrejaAtiva.id}` : 'global';
+      const extension = (file.name?.split('.').pop() || 'png').toLowerCase();
+      const path = `assinaturas/${igrejaSlug}/${Date.now()}.${extension}`;
+      // Sem compressão: preserva a transparência do PNG.
+      const { file_url, path: storedPath } = await base44.integrations.Core.UploadFile({
+        file,
+        bucket: STORAGE_BUCKETS.documentos,
+        path,
+      });
+      setFormData((prev) => ({
+        ...prev,
+        assinatura_url: file_url,
+        assinatura_path: storedPath,
+        assinatura_bucket: STORAGE_BUCKETS.documentos,
+      }));
+    } catch (error) {
+      console.error('Erro ao enviar a assinatura:', error);
+      alert('Erro ao enviar a assinatura: ' + (error?.message || ''));
+    }
+    setUploadingAssinatura(false);
+  };
+
+  const removerAssinatura = () =>
+    setFormData((prev) => ({ ...prev, assinatura_url: '', assinatura_path: '', assinatura_bucket: '' }));
 
   const previewLogo = formData.logo_url || ieadLogo;
   const sugestaoNome = igrejaAtiva?.nome ? `Ex.: ${igrejaAtiva.nome}` : 'Ex.: Igreja Evangélica Assembleia de Deus';
@@ -311,6 +358,53 @@ export default function Configuracoes() {
                       Formatos aceitos: PNG, JPG, SVG. Tamanho recomendado: 400x400px
                     </p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-lg border-0">
+              <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50">
+                <CardTitle className="flex items-center gap-2">
+                  <PenLine className="w-5 h-5" />
+                  Assinatura do Pastor Presidente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex justify-center">
+                    <div className="w-full max-w-md h-32 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center p-3">
+                      {formData.assinatura_url ? (
+                        <img src={formData.assinatura_url} alt="Assinatura do pastor presidente" className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <span className="text-sm text-slate-400">Nenhuma assinatura enviada</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 text-center">
+                    Aparece no verso do cartão de membro, acima do nome do pastor presidente.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input id="assinatura" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAssinaturaUpload} className="hidden" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('assinatura').click()}
+                      disabled={uploadingAssinatura}
+                      className="flex-1"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploadingAssinatura ? 'Enviando...' : formData.assinatura_url ? 'Trocar assinatura' : 'Enviar assinatura'}
+                    </Button>
+                    {formData.assinatura_url && (
+                      <Button type="button" variant="outline" onClick={removerAssinatura} className="text-red-600">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remover
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    Use PNG com fundo transparente, assinatura em tinta escura (até 2 MB). Depois clique em <strong>Salvar Configurações</strong>.
+                  </p>
                 </div>
               </CardContent>
             </Card>
