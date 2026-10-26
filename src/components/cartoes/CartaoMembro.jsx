@@ -24,6 +24,10 @@ export const categoriaCartao = (membro) => {
   return 'Membro';
 };
 
+/** Recebe matrícula/cartão: tipo "membro" ou marcado como obreiro. */
+export const elegivelCartao = (membro) =>
+  (membro?.tipo || '').toLowerCase() === 'membro' || Boolean(membro?.obreiro);
+
 export const formatMatricula = (n) =>
   n === null || n === undefined || n === '' ? '—' : String(n).padStart(5, '0');
 

@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useChurch } from '@/context/ChurchContext.jsx';
 import FotoMembroUpload, { uploadMemberPhoto, getPendingPhotoFile, clearPendingPhotoFile } from './FotoMembroUpload';
 
 export default function ModalMembro({
@@ -32,6 +33,7 @@ export default function ModalMembro({
 }) {
   const DRAFT_KEY = 'draft_membro';
   const queryClient = useQueryClient();
+  const { igrejaAtiva } = useChurch();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const pendingFotoFileRef = useRef(null);
@@ -216,6 +218,12 @@ export default function ModalMembro({
         departamento_nome: departamentosSelecionados.map((dept) => dept.nome).join(', '),
         departamentos_nomes: departamentosSelecionados.map((dept) => dept.nome),
       };
+
+      // Todo cadastro precisa pertencer a uma igreja (congregação > igreja ativa).
+      const igrejaId = membro?.igreja_id || congregacao?.igreja_id || igrejaAtiva?.id || null;
+      if (igrejaId) dataToSave.igreja_id = igrejaId;
+      // Matrícula é controlada pelo banco (trigger); nunca enviar do formulário.
+      delete dataToSave.matricula;
 
       if (membro) {
         return base44.entities.Membro.update(membro.id, dataToSave);

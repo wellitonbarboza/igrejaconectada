@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext.jsx';
 import { uploadElementSnapshot } from '@/utils/documentCapture';
 import MemberAvatar from '@/components/membros/MemberAvatar.jsx';
-import { CartaoFrente, CartaoVerso, CARTAO_CSS, categoriaCartao, formatMatricula } from '@/components/cartoes/CartaoMembro.jsx';
+import { CartaoFrente, CartaoVerso, CARTAO_CSS, categoriaCartao, elegivelCartao, formatMatricula } from '@/components/cartoes/CartaoMembro.jsx';
 import { useChurch } from '@/context/ChurchContext.jsx';
 import { isArchivedMember } from '@/utils/memberStatus';
 
@@ -31,11 +31,11 @@ export default function Cartoes() {
     initialData: [],
   });
 
-  // Cartão só para cadastros do tipo "membro" e fora do arquivo morto
-  // (inativo/transferido). Congregados, crianças e visitantes não recebem cartão.
+  // Cartão só para membros ou obreiros, fora do arquivo morto (inativo/transferido).
+  // Congregados, crianças e visitantes sem cargo de obreiro não recebem cartão.
   const membros = React.useMemo(
     () => (membrosTodos || []).filter(
-      (m) => (m.tipo || '').toLowerCase() === 'membro' && !isArchivedMember(m)
+      (m) => elegivelCartao(m) && !isArchivedMember(m)
     ),
     [membrosTodos]
   );
@@ -103,7 +103,7 @@ export default function Cartoes() {
               <CreditCard className="w-8 h-8 text-blue-600" />
               Cartões de Membros
             </h1>
-            <p className="text-slate-500 mt-1">Selecione os membros para gerar o cartão (frente e verso). Apenas membros ativos.</p>
+            <p className="text-slate-500 mt-1">Selecione os membros para gerar o cartão (frente e verso). Apenas membros e obreiros ativos.</p>
           </div>
           <div className="flex flex-wrap gap-2">
           <Button
