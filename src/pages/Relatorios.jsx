@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   FileText,
   Cake,
   Users,
-  Download,
   TrendingUp,
   ImageDown,
 } from 'lucide-react';
@@ -22,16 +21,16 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
-import AtaModal from '@/components/relatorios/AtaModal.jsx';
-import { FileText as FileTextIcon, Eye } from 'lucide-react';
+import HistoricoAtas from '@/components/relatorios/HistoricoAtas.jsx';
+import BotoesExportar from '@/components/relatorios/BotoesExportar.jsx';
+import { salvarCanvasPng } from '@/utils/exportar';
 import { isArchivedMember } from '@/utils/memberStatus';
 
 export default function Relatorios() {
   const { user } = useAuth();
   const [tipoRelatorio, setTipoRelatorio] = useState('aniversariantes');
   const [mesSelecionado, setMesSelecionado] = useState(new Date().getMonth());
-  const [setorSelecionado, setSetorSelecionado] = useState('todos');
-  const [reuniaoAta, setReuniaoAta] = useState(null);
+  const relatorioRef = useRef(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -47,31 +46,13 @@ export default function Relatorios() {
     [membrosTodos]
   );
 
-  const { data: departamentos = [] } = useQuery({
-    queryKey: ['departamentos'],
-    queryFn: () => base44.entities.Departamento.list('nome'),
-    initialData: [],
-  });
-  const { data: reunioes = [] } = useQuery({
-    queryKey: ['setor_reunioes'],
-    queryFn: () => base44.entities.SetorReuniao.list('-data_reuniao'),
-    initialData: [],
-  });
-  const { data: presencas = [] } = useQuery({
-    queryKey: ['setor_presencas'],
-    queryFn: () => base44.entities.SetorPresenca.list(),
-    initialData: [],
-  });
-
-  const reunioesFiltradas = reunioes.filter((r) => {
-    if (!r.data_reuniao) return false;
-    const d = new Date(`${r.data_reuniao}T00:00:00`);
-    if (d.getMonth() !== mesSelecionado) return false;
-    if (setorSelecionado !== 'todos' && r.departamento_id !== setorSelecionado) return false;
-    return true;
-  });
-
   const filteredMembros = membros;
+
+  const tituloRelatorio = {
+    aniversariantes: 'Aniversariantes',
+    estatisticas: 'Estatisticas Gerais',
+    membros: 'Lista de Membros',
+  };
 
   const aniversariantes = filteredMembros
     .filter((m) => {
@@ -289,15 +270,10 @@ export default function Relatorios() {
         posicaoYRodape += 28;
       });
 
-      const link = document.createElement('a');
-      link.download = `aniversariantes-${meses[mesSelecionado].toLowerCase()}-semana-${index + 1}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      salvarCanvasPng(canvas, `aniversariantes-${meses[mesSelecionado].toLowerCase()}-semana-${index + 1}.png`).catch((err) =>
+        window.alert('Não foi possível salvar a imagem: ' + (err?.message || ''))
+      );
     });
-  };
-
-  const handleDownloadPDF = () => {
-    window.print();
   };
 
   const meses = [
@@ -339,13 +315,12 @@ export default function Relatorios() {
                 Gerar imagem
               </Button>
             )}
-            <Button
-              onClick={handleDownloadPDF}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Baixar PDF
-            </Button>
+            {tipoRelatorio !== 'atas' && (
+              <BotoesExportar
+                alvoRef={relatorioRef}
+                titulo={`Relatorio ${tituloRelatorio[tipoRelatorio] || ''}${tipoRelatorio === 'aniversariantes' ? ` ${meses[mesSelecionado]}` : ''}`}
+              />
+            )}
           </div>
         </div>
 
@@ -367,7 +342,7 @@ export default function Relatorios() {
                 </SelectContent>
               </Select>
 
-              {(tipoRelatorio === 'aniversariantes' || tipoRelatorio === 'atas') && (
+              {tipoRelatorio === 'aniversariantes' && (
                 <Select value={mesSelecionado.toString()} onValueChange={(value) => setMesSelecionado(Number(value))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -382,23 +357,13 @@ export default function Relatorios() {
                 </Select>
               )}
 
-              {tipoRelatorio === 'atas' && (
-                <Select value={setorSelecionado} onValueChange={setSetorSelecionado}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Setor / Departamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os setores</SelectItem>
-                    {departamentos.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
             </div>
           </CardContent>
         </Card>
 
+        {tipoRelatorio === 'atas' && <HistoricoAtas mesInicial={mesSelecionado} />}
+
+        <div ref={relatorioRef} className="space-y-6">
         {tipoRelatorio === 'aniversariantes' && (
           <Card className="shadow-lg border-0">
             <CardHeader className="border-b bg-gradient-to-r from-pink-50 to-purple-50">
@@ -508,51 +473,7 @@ export default function Relatorios() {
           </div>
         )}
 
-        {tipoRelatorio === 'atas' && (
-          <Card className="shadow-lg border-0">
-            <CardHeader className="border-b bg-gradient-to-r from-amber-50 to-orange-50">
-              <CardTitle className="flex items-center gap-2">
-                <FileTextIcon className="w-5 h-5" />
-                Reuniões em {meses[mesSelecionado]} ({reunioesFiltradas.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              {reunioesFiltradas.length === 0 ? (
-                <p className="text-center text-slate-500 py-8">Nenhuma reunião encontrada para os filtros selecionados.</p>
-              ) : (
-                <div className="space-y-3">
-                  {reunioesFiltradas.map((r) => {
-                    const dep = departamentos.find((d) => d.id === r.departamento_id);
-                    const qtdPres = presencas.filter((p) => p.reuniao_id === r.id && p.presente !== false).length;
-                    return (
-                      <div key={r.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-900">{r.tema || 'Reunião'}</p>
-                          <p className="text-sm text-slate-500">
-                            {dep?.nome || r.departamento_nome || '—'} •{' '}
-                            {format(new Date(`${r.data_reuniao}T00:00:00`), "dd/MM/yyyy", { locale: ptBR })}
-                            {r.hora_inicio ? ` às ${r.hora_inicio}` : ''}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-1">
-                            {qtdPres} presença(s) • Resp: {r.responsavel_nome || '—'}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => setReuniaoAta(r)}
-                          className="bg-gradient-to-r from-amber-500 to-orange-600"
-                        >
-                          <Eye className="w-4 h-4 mr-2" /> Visualizar ATA
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-                {tipoRelatorio === 'membros' && (
+        {tipoRelatorio === 'membros' && (
           <Card className="shadow-lg border-0">
             <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-purple-50">
               <CardTitle className="flex items-center gap-2">
@@ -584,18 +505,8 @@ export default function Relatorios() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
-
-      {reuniaoAta && (
-        <AtaModal
-          open={!!reuniaoAta}
-          onClose={() => setReuniaoAta(null)}
-          reuniao={reuniaoAta}
-          presencas={presencas}
-          membros={membros}
-          departamento={departamentos.find((d) => d.id === reuniaoAta.departamento_id)}
-        />
-      )}
     </div>
   );
 }

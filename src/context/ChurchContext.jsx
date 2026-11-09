@@ -9,7 +9,7 @@ export const MODULOS = [
   { key: 'secretaria', label: 'Secretaria' },
   { key: 'tesouraria', label: 'Tesouraria' },
   { key: 'ebd', label: 'EBD' },
-  { key: 'setores', label: 'Presença de Setores' },
+  { key: 'setores', label: 'Reuniões / ATA' },
 ];
 
 const ChurchContext = createContext({

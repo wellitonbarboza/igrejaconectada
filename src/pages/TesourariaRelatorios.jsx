@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, Printer, Users } from 'lucide-react';
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import BotoesExportar from '@/components/relatorios/BotoesExportar.jsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -99,11 +100,11 @@ export default function TesourariaRelatorios() {
 
   const mesLabel = mes ? format(new Date(`${mes}-01T00:00:00`), "MMMM 'de' yyyy", { locale: ptBR }) : '';
 
-  const print = () => window.print();
+  const relatorioRef = useRef(null);
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div ref={relatorioRef} className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
@@ -112,12 +113,10 @@ export default function TesourariaRelatorios() {
             </h1>
             <p className="text-slate-500 mt-1">Escolha o tipo de relatório e o mês.</p>
           </div>
-          <Button variant="outline" onClick={print}>
-            <Printer className="w-4 h-4 mr-2" /> Imprimir
-          </Button>
+            <BotoesExportar alvoRef={relatorioRef} titulo={`Relatorio Tesouraria ${mesLabel}`} className="flex-wrap" />
         </div>
 
-        <Card className="shadow-lg border-0 print:shadow-none">
+        <Card className="shadow-lg border-0 print:hidden">
           <CardHeader><CardTitle>Filtros</CardTitle></CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-3">

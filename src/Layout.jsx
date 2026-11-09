@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import {
@@ -33,6 +33,9 @@ import {
   Church,
   SlidersHorizontal,
   UserCog,
+  ChevronDown,
+  Presentation,
+  NotebookPen,
 } from 'lucide-react';
 import ChurchLogo from '@/components/ChurchLogo.jsx';
 import {
@@ -78,9 +81,20 @@ export default function Layout({ children }) {
       subgroups: [
         {
           label: 'Cultos',
+          icon: Church,
           items: [
             { title: 'Presença', url: createPageUrl('PresencaCultos'), icon: CalendarCheck, page: 'PresencaCultos' },
             { title: 'Relatórios', url: createPageUrl('CultosRelatorios'), icon: BarChart3, page: 'CultosRelatorios' },
+          ],
+        },
+        {
+          label: 'Reuniões',
+          icon: Presentation,
+          // Antigo módulo "Setores": aparece se Secretaria OU Setores estiver ativo.
+          modulos: ['secretaria', 'setores'],
+          items: [
+            { title: 'ATA', url: createPageUrl('PresencaSetores'), icon: NotebookPen, page: 'PresencaSetores' },
+            { title: 'Relatórios', url: createPageUrl('ReunioesRelatorios'), icon: FileText, page: 'ReunioesRelatorios' },
           ],
         },
       ],
@@ -102,13 +116,6 @@ export default function Layout({ children }) {
         { title: 'Aulas & Presença', url: createPageUrl('EbdAulas'), icon: BookOpen, page: 'EbdAulas' },
         { title: 'Caixa EBD', url: createPageUrl('EbdCaixa'), icon: Wallet, page: 'EbdCaixa' },
         { title: 'Relatórios', url: createPageUrl('EbdRelatorios'), icon: BarChart3, page: 'EbdRelatorios' },
-      ],
-    },
-    {
-      label: 'Setores',
-      modulo: 'setores',
-      items: [
-        { title: 'Presença de Setores', url: createPageUrl('PresencaSetores'), icon: ClipboardCheck, page: 'PresencaSetores' },
       ],
     },
     {
@@ -138,10 +145,12 @@ export default function Layout({ children }) {
         return { ...group, items: [] };
       }
       // Quando o módulo não está ativo para a igreja (exceto super admin), esconde o grupo.
-      const moduloLiberado = group.modulo === null || superAdmin || isModuloAtivo(modulosAtivos, group.modulo);
-      if (!moduloLiberado) return { ...group, items: [], subgroups: [] };
-      const items = group.items.filter((item) => hasPageAccess(user, item.page));
+      const liberado = (modulo) => modulo === null || modulo === undefined || superAdmin || isModuloAtivo(modulosAtivos, modulo);
+      const moduloLiberado = liberado(group.modulo);
+      const items = moduloLiberado ? group.items.filter((item) => hasPageAccess(user, item.page)) : [];
+      // Subgrupo pode declarar "modulos" próprios (qualquer um ativo libera); senão herda o do grupo.
       const subgroups = (group.subgroups || [])
+        .filter((sub) => (sub.modulos ? sub.modulos.some(liberado) : moduloLiberado))
         .map((sub) => ({ ...sub, items: sub.items.filter((item) => hasPageAccess(user, item.page)) }))
         .filter((sub) => sub.items.length > 0);
       return { ...group, items, subgroups };
@@ -156,7 +165,7 @@ export default function Layout({ children }) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
-        <Sidebar className="border-r border-slate-200 bg-white">
+        <Sidebar className="border-r border-slate-200 bg-white print:hidden">
           <SidebarHeader className="border-b border-slate-200 p-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md bg-white border border-sky-100 overflow-hidden">
@@ -221,30 +230,7 @@ export default function Layout({ children }) {
                   </SidebarMenu>
 
                   {(group.subgroups || []).map((sub) => (
-                    <div key={sub.label} className="mt-2 ml-2 pl-2 border-l border-slate-200">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] px-3 py-1.5">
-                        {sub.label}
-                      </p>
-                      <SidebarMenu>
-                        {sub.items.map((item) => (
-                          <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton
-                              asChild
-                              className={`hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200 rounded-lg mb-1 ${
-                                location.pathname === item.url
-                                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white hover:from-blue-500 hover:to-purple-600 shadow-indigo'
-                                  : ''
-                              }`}
-                            >
-                              <Link to={item.url} className="flex items-center gap-3 px-3 py-2.5">
-                                <item.icon className="w-5 h-5" />
-                                <span className="font-medium">{item.title}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        ))}
-                      </SidebarMenu>
-                    </div>
+                    <SubmenuSidebar key={sub.label} sub={sub} pathname={location.pathname} />
                   ))}
                 </SidebarGroupContent>
               </SidebarGroup>
@@ -310,7 +296,7 @@ export default function Layout({ children }) {
         </Sidebar>
 
         <main className="flex-1 flex flex-col">
-          <header className="bg-white border-b border-slate-200 px-6 py-4 lg:hidden">
+          <header className="bg-white border-b border-slate-200 px-6 py-4 lg:hidden print:hidden">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="hover:bg-slate-100 p-2 rounded-lg transition-colors duration-200">
                 <Menu className="w-5 h-5" />
@@ -326,5 +312,53 @@ export default function Layout({ children }) {
         </main>
       </div>
     </SidebarProvider>
+  );
+}
+
+/** Submenu recolhível (ex.: Secretaria › Cultos, Secretaria › Reuniões). */
+function SubmenuSidebar({ sub, pathname }) {
+  const ativo = sub.items.some((item) => item.url === pathname);
+  const [aberto, setAberto] = useState(ativo);
+  const aberto_ = aberto || ativo;
+  const Icone = sub.icon;
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto_}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-indigo-50 hover:text-indigo-700 ${
+          ativo ? 'text-indigo-700 font-semibold' : 'text-slate-700'
+        }`}
+      >
+        {Icone && <Icone className="w-5 h-5" />}
+        <span className="font-medium flex-1 text-left">{sub.label}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${aberto_ ? 'rotate-180' : ''}`} />
+      </button>
+      {aberto_ && (
+        <div className="ml-5 pl-2 border-l border-slate-200">
+          <SidebarMenu>
+            {sub.items.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  className={`hover:bg-indigo-50 hover:text-indigo-700 transition-all duration-200 rounded-lg mb-1 ${
+                    pathname === item.url
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:text-white hover:from-blue-500 hover:to-purple-600 shadow-indigo'
+                      : ''
+                  }`}
+                >
+                  <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                    <item.icon className="w-4 h-4" />
+                    <span className="font-medium text-sm">{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </div>
+      )}
+    </div>
   );
 }

@@ -118,3 +118,12 @@ body {
   background-color: rgb(148 163 184);
   border-radius: 9999px;
 }
+
+/* Impressão pelo navegador (Ctrl+P): só o conteúdo, sem menu lateral e sem cortes. */
+@media print {
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
+  .min-h-screen { min-height: 0 !important; }
+  main, main > div { overflow: visible !important; }
+  .shadow-lg, .shadow-xl, .shadow-2xl { box-shadow: none !important; }
+  tr, li, .pdf-bloco { break-inside: avoid; }
+}
