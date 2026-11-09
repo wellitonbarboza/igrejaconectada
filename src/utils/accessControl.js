@@ -51,8 +51,9 @@ export const ALL_MANAGEABLE_PAGES = [
   { page: 'EbdAulas', label: 'EBD · Aulas e Presença', actions: ['view', 'create', 'edit', 'delete'], modulo: 'ebd' },
   { page: 'EbdRelatorios', label: 'EBD · Relatórios', actions: ['view'], modulo: 'ebd' },
   { page: 'EbdCaixa', label: 'EBD · Caixa', actions: ['view', 'create', 'edit', 'delete'], modulo: 'ebd' },
-  // Setores
-  { page: 'PresencaSetores', label: 'Presença de Setores', actions: ['view', 'create', 'edit', 'delete'], modulo: 'setores' },
+  // Secretaria › Reuniões (antigo módulo Setores)
+  { page: 'PresencaSetores', label: 'Reuniões · ATA', actions: ['view', 'create', 'edit', 'delete'], modulo: 'setores' },
+  { page: 'ReunioesRelatorios', label: 'Reuniões · Relatórios', actions: ['view'], modulo: 'setores' },
   // Admin geral
   { page: 'AdminIgrejas', label: 'Admin · Igrejas', actions: ['view', 'create', 'edit', 'delete'], modulo: 'admin' },
   { page: 'AdminModulos', label: 'Admin · Módulos por Igreja', actions: ['view', 'edit'], modulo: 'admin' },
@@ -78,6 +79,7 @@ const DEFAULT_USUARIO_PERMISSIONS = {
   Cartas: ['view'],
   PresencaCultos: ['view', 'create', 'edit'],
   CultosRelatorios: ['view'],
+  ReunioesRelatorios: ['view'],
   Download: ['view'],
 };
 
@@ -135,7 +137,14 @@ export const hasPageAccess = (user, page) => {
 
   const perms = getResolvedPermissions(user);
   const pagePerms = perms[page];
-  return Array.isArray(pagePerms) && pagePerms.length > 0;
+  if (Array.isArray(pagePerms) && pagePerms.length > 0) return true;
+  // Páginas novas herdam acesso de páginas equivalentes (permissões já salvas).
+  return (PAGE_FALLBACKS[page] || []).some((p) => Array.isArray(perms[p]) && perms[p].length > 0);
+};
+
+/** Página nova -> páginas antigas cuja permissão concede visualização. */
+const PAGE_FALLBACKS = {
+  ReunioesRelatorios: ['PresencaSetores', 'Relatorios'],
 };
 
 /**

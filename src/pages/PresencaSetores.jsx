@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Plus, Users, Save, Trash2 } from 'lucide-react';
+import { ClipboardCheck, Plus, Users, Save, Trash2, FileText } from 'lucide-react';
+import AtaModal from '@/components/relatorios/AtaModal.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ export default function PresencaSetores() {
   });
   const [observacoes, setObservacoes] = useState('');
   const [presencas, setPresencas] = useState({}); // { membroId: { presente, justificativa } }
+  const [ataAberta, setAtaAberta] = useState(false);
 
   const { data: departamentos = [] } = useQuery({
     queryKey: ['departamentos'],
@@ -141,7 +143,7 @@ export default function PresencaSetores() {
   });
 
   const salvarMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ silencioso } = {}) => {
       if (!reuniaoId) throw new Error('Selecione uma reunião.');
       await base44.entities.SetorReuniao.update(reuniaoId, { observacoes });
       for (const membro of membrosDoDepartamento) {
@@ -163,10 +165,10 @@ export default function PresencaSetores() {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['setor_presencas'] });
       queryClient.invalidateQueries({ queryKey: ['setor_reunioes'] });
-      alert('Presença salva!');
+      if (!vars?.silencioso) alert('Presença salva!');
     },
     onError: (err) => alert('Erro ao salvar: ' + (err?.message || '')),
   });
@@ -193,6 +195,29 @@ export default function PresencaSetores() {
     });
   };
 
+  // Presenças atuais (inclui marcações ainda não salvas) para montar a ATA
+  const presencasParaAta = useMemo(
+    () =>
+      membrosDoDepartamento.map((m) => ({
+        reuniao_id: reuniaoId,
+        membro_id: m.id,
+        membro_nome: m.nome_completo,
+        presente: presencas[m.id]?.presente !== false,
+      })),
+    [membrosDoDepartamento, presencas, reuniaoId]
+  );
+
+  const gerarAta = async () => {
+    if (perms.canEdit) {
+      try {
+        await salvarMutation.mutateAsync({ silencioso: true });
+      } catch {
+        return; // erro já exibido pelo onError
+      }
+    }
+    setAtaAberta(true);
+  };
+
   const presentesCount = membrosDoDepartamento.filter((m) => presencas[m.id]?.presente !== false && presencas[m.id]?.presente !== undefined).length;
 
   return (
@@ -201,10 +226,10 @@ export default function PresencaSetores() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <ClipboardCheck className="w-8 h-8 text-teal-600" />
-            Presença de Setores
+            Reuniões · ATA
           </h1>
           <p className="text-slate-500 mt-1">
-            Lista de presença para reuniões de departamentos/setores já cadastrados.
+            Crie a reunião do setor, marque a presença, registre o que foi tratado e gere a ATA para imprimir ou baixar.
           </p>
         </div>
 
@@ -329,8 +354,8 @@ export default function PresencaSetores() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label>Observações da reunião</Label>
-                <Textarea rows={3} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
+                <Label>Assuntos tratados / deliberações (texto da ATA)</Label>
+                <Textarea rows={6} placeholder="Descreva a pauta, decisões e encaminhamentos da reunião."  value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
               </div>
               <div className="flex justify-between items-center gap-2 flex-wrap">
                 {perms.canDelete && (
@@ -345,11 +370,20 @@ export default function PresencaSetores() {
                     <Trash2 className="w-4 h-4 mr-2 text-red-500" /> Excluir reunião
                   </Button>
                 )}
+                <Button
+                  variant="outline"
+                  onClick={gerarAta}
+                  disabled={salvarMutation.isPending}
+                  className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-50"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  {perms.canEdit ? 'Salvar e gerar ATA' : 'Gerar ATA'}
+                </Button>
                 {perms.canEdit && (
                   <Button
                     onClick={() => salvarMutation.mutate()}
                     disabled={salvarMutation.isPending}
-                    className="bg-gradient-to-r from-green-500 to-blue-600 ml-auto"
+                    className="bg-gradient-to-r from-green-500 to-blue-600"
                   >
                     <Save className="w-4 h-4 mr-2" />
                     {salvarMutation.isPending ? 'Salvando...' : 'Salvar presenças'}
@@ -360,6 +394,17 @@ export default function PresencaSetores() {
           </Card>
         )}
       </div>
+
+      {ataAberta && reuniaoAtual && (
+        <AtaModal
+          open={ataAberta}
+          onClose={() => setAtaAberta(false)}
+          reuniao={{ ...reuniaoAtual, observacoes }}
+          presencas={presencasParaAta}
+          membros={membros}
+          departamento={departamentoSelecionado}
+        />
+      )}
 
       <Dialog open={showNovaReuniao} onOpenChange={setShowNovaReuniao}>
         <DialogContent className="max-w-md">

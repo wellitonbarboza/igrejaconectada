@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, Printer, Users, CalendarCheck, UserPlus, MessageCircle } from 'lucide-react';
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import BotoesExportar from '@/components/relatorios/BotoesExportar.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -153,7 +154,7 @@ export default function CultosRelatorios() {
   const congregacaoLabel = congregacaoFiltro === 'todas' ? 'Todas as congregações' : (congregacaoNome[congregacaoFiltro] || 'Congregação');
   const tipoLabel = tipoFiltro === 'todos' ? 'Todos os cultos' : tipoCultoLabel(tipoFiltro);
 
-  const print = () => window.print();
+  const relatorioRef = useRef(null);
 
   const buildWhatsAppText = () => {
     const linhas = [];
@@ -201,7 +202,7 @@ export default function CultosRelatorios() {
 
   return (
     <div className="p-4 md:p-8 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div ref={relatorioRef} className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
@@ -214,9 +215,7 @@ export default function CultosRelatorios() {
             <Button variant="outline" onClick={copiarWhatsApp}>
               <MessageCircle className="w-4 h-4 mr-2" /> {copiado ? 'Copiado!' : 'Texto p/ WhatsApp'}
             </Button>
-            <Button variant="outline" onClick={print}>
-              <Printer className="w-4 h-4 mr-2" /> Imprimir
-            </Button>
+            <BotoesExportar alvoRef={relatorioRef} titulo={`Frequencia cultos ${periodoLabel}`} className="flex-wrap" />
           </div>
         </div>
 

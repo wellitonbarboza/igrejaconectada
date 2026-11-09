@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Printer, Download, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import BotoesExportar from '@/components/relatorios/BotoesExportar.jsx';
 import ChurchLogo from '@/components/ChurchLogo.jsx';
 import { useChurch } from '@/context/ChurchContext.jsx';
 import { format } from 'date-fns';
@@ -21,6 +22,7 @@ export default function AtaModal({ open, onClose, reuniao, presencas, membros, d
   const { config, igrejaAtiva } = useChurch();
   const [secretario, setSecretario] = useState(config?.secretario || '');
   const [pastor, setPastor] = useState(config?.pastor_presidente || '');
+  const ataRef = useRef(null);
   const [local, setLocal] = useState(config?.cidade ? `${config.cidade}/${config.estado || ''}`.replace(/\/$/, '') : '');
 
   if (!reuniao) return null;
@@ -41,17 +43,15 @@ export default function AtaModal({ open, onClose, reuniao, presencas, membros, d
     ? format(new Date(`${reuniao.data_reuniao}T00:00:00`), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
     : '—';
 
-  const handlePrint = () => window.print();
+  const tituloArquivo = `ATA ${departamento?.nome || reuniao.departamento_nome || ''} ${reuniao.data_reuniao || ''}`.trim();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0 gap-0">
         <DialogHeader className="px-6 py-4 border-b print:hidden flex flex-row items-center justify-between">
           <DialogTitle>Visualização da ATA</DialogTitle>
-          <div className="flex gap-2">
-            <Button onClick={handlePrint} className="bg-gradient-to-r from-blue-500 to-purple-600">
-              <Printer className="w-4 h-4 mr-2" /> Imprimir / PDF
-            </Button>
+          <div className="flex gap-2 flex-wrap justify-end">
+            <BotoesExportar alvoRef={ataRef} titulo={tituloArquivo} />
             <Button variant="outline" onClick={onClose}>
               <X className="w-4 h-4" />
             </Button>
@@ -75,7 +75,7 @@ export default function AtaModal({ open, onClose, reuniao, presencas, membros, d
         </div>
 
         {/* ATA — área imprimível */}
-        <div id="ata-print-area" className="px-10 py-8 bg-white text-slate-900 print:px-[18mm] print:py-[15mm]">
+        <div id="ata-print-area" ref={ataRef} className="px-10 py-8 bg-white text-slate-900 print:px-[18mm] print:py-[15mm]">
           {/* Cabeçalho da Igreja */}
           <div className="flex items-center gap-4 pb-4 border-b-2 border-slate-800">
             <ChurchLogo className="w-16 h-16 object-contain" />
@@ -161,15 +161,6 @@ export default function AtaModal({ open, onClose, reuniao, presencas, membros, d
           </div>
         </div>
 
-        <style>{`
-          @page { size: A4; margin: 12mm; }
-          @media print {
-            body * { visibility: hidden; }
-            #ata-print-area, #ata-print-area * { visibility: visible; }
-            #ata-print-area { position: absolute; left: 0; top: 0; width: 100%; }
-            .print\\:hidden { display: none !important; }
-          }
-        `}</style>
       </DialogContent>
     </Dialog>
   );
