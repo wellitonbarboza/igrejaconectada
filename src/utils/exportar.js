@@ -19,6 +19,25 @@ const deveIgnorar = (el) =>
   el?.classList?.contains('no-export') ||
   el?.dataset?.noExport !== undefined;
 
+/** Falha ao baixar parte do app (versão nova publicada com o app aberto). */
+const ehErroDeVersao = (err) =>
+  /dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError|error loading dynamically/i.test(
+    String(err?.message || err)
+  );
+
+async function carregarBibliotecas() {
+  try {
+    const { html2canvas, jsPDF } = await carregarBibliotecas();
+    return { html2canvas, jsPDF };
+  } catch (err) {
+    if (ehErroDeVersao(err)) {
+      if (window.confirm('O app foi atualizado. Toque em OK para recarregar e tente de novo.')) window.location.reload();
+      throw new Error('App atualizado — recarregue e tente novamente.');
+    }
+    throw err;
+  }
+}
+
 export const isMobile = () =>
   typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent || '');
 
@@ -159,7 +178,7 @@ function pontosDeQuebra(raiz) {
  */
 export async function gerarPdf(elemento, opcoes = {}) {
   if (!elemento) throw new Error('Nada para exportar.');
-  const { orientacao = 'retrato', escala = 2, titulo, margemMm = MARGEM_PADRAO_MM } = opcoes;
+  const { orientacao = 'retrato', escala = 2, titulo, margemMm = MARGEM_PADRAO_MM, cssExtra = '' } = opcoes;
   const MARGEM_MM = margemMm;
 
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
@@ -175,6 +194,11 @@ export async function gerarPdf(elemento, opcoes = {}) {
     windowWidth: Math.max(larguraCss, 900),
     ignoreElements: deveIgnorar,
     onclone: (doc) => {
+      if (cssExtra) {
+        const st = doc.createElement('style');
+        st.textContent = cssExtra;
+        doc.head.appendChild(st);
+      }
       // Remove limites de altura/rolagem (ex.: conteúdo dentro de modal).
       doc.querySelectorAll('[role="dialog"], .overflow-y-auto, .overflow-auto').forEach((el) => {
         el.style.maxHeight = 'none';
@@ -197,7 +221,8 @@ export async function gerarPdf(elemento, opcoes = {}) {
 
   let inicio = 0;
   let primeira = true;
-  while (inicio < canvas.height - 2) {
+  const sobraIgnoravel = Math.max(3, Math.round(alturaPaginaPx * 0.015));
+  while (inicio < canvas.height - sobraIgnoravel) {
     let fim = Math.min(inicio + alturaPaginaPx, canvas.height);
     if (fim < canvas.height) {
       // Quebra no último limite seguro dentro da página (desde que use ao menos 60% dela).
@@ -233,14 +258,14 @@ export async function baixarPdf(elemento, nomeArquivo, opcoes = {}) {
  * Imprime somente o elemento, num iframe com os estilos da página.
  * No celular gera o PDF e abre o compartilhamento — de lá dá para imprimir.
  */
-export async function imprimirElemento(elemento, { titulo = 'Relatório', orientacao = 'retrato', nomeArquivo, margemMm } = {}) {
+export async function imprimirElemento(elemento, { titulo = 'Relatório', orientacao = 'retrato', nomeArquivo, margemMm, cssExtra = '' } = {}) {
   if (!elemento) throw new Error('Nada para imprimir.');
 
   // Celular: impressão do navegador falha no app instalado e, no Android, o
   // iframe imprime a página inteira. Geramos o PDF e o usuário imprime pelo
   // visualizador/compartilhamento do aparelho.
   if (isMobile()) {
-    return baixarPdf(elemento, nomeArquivo || nomeArquivoSeguro(titulo), { orientacao, titulo, margemMm });
+    return baixarPdf(elemento, nomeArquivo || nomeArquivoSeguro(titulo), { orientacao, titulo, margemMm, cssExtra });
   }
 
   const clone = elemento.cloneNode(true);
@@ -274,6 +299,7 @@ export async function imprimirElemento(elemento, { titulo = 'Relatório', orient
   .shadow-lg, .shadow-xl, .shadow-2xl, .shadow-md { box-shadow: none !important; }
   tr, li, .pdf-bloco, [data-pdf-bloco] { break-inside: avoid; page-break-inside: avoid; }
   * { overflow: visible !important; max-height: none !important; }
+  ${cssExtra}
 </style></head><body></body></html>`);
   doc.close();
   doc.body.appendChild(doc.importNode(clone, true));

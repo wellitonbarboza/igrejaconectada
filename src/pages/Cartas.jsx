@@ -253,6 +253,21 @@ export default function Cartas() {
   // Página A4 da carta (filho direto da área de impressão)
   const paginaCarta = () => cartaRef.current?.firstElementChild || cartaRef.current;
 
+  // Saída (PDF/impressão): folha A4 com margem de 10 mm em volta e a carta
+  // reacomodada em 190 × 274 mm (6 mm de folga no rodapé). Assim nada fica na faixa que impressoras e
+  // celulares não imprimem (era onde o versículo do rodapé era cortado).
+  const MARGEM_CARTA_MM = 10;
+  const CSS_SAIDA_CARTA = `
+    .carta-pagina {
+      width: 190mm !important;
+      height: 274mm !important;
+      padding: 0 2mm 6mm !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      background: #fff !important;
+    }
+  `;
+
   const nomeArquivoCarta = () =>
     nomeArquivoSeguro(`carta-${tipoCarta}-${membroSelecionado?.nome_completo || 'membro'}-${format(new Date(), 'yyyy-MM-dd')}`);
 
@@ -262,7 +277,7 @@ export default function Cartas() {
     const pagina = paginaCarta();
     if (!pagina) return;
     try {
-      await imprimirElemento(pagina, { titulo: 'Carta', margemMm: 0, nomeArquivo: nomeArquivoCarta() });
+      await imprimirElemento(pagina, { titulo: 'Carta', margemMm: MARGEM_CARTA_MM, cssExtra: CSS_SAIDA_CARTA, nomeArquivo: nomeArquivoCarta() });
     } catch (error) {
       console.error('Erro ao imprimir carta:', error);
       window.alert(`Não foi possível imprimir a carta: ${error?.message || 'erro desconhecido'}`);
@@ -276,10 +291,10 @@ export default function Cartas() {
       return;
     }
     try {
-      await baixarPdf(pagina, nomeArquivoCarta(), { titulo: 'Carta', margemMm: 0 });
+      await baixarPdf(pagina, nomeArquivoCarta(), { titulo: 'Carta', margemMm: MARGEM_CARTA_MM, cssExtra: CSS_SAIDA_CARTA });
     } catch (error) {
       console.error('Erro ao gerar PDF da carta:', error);
-      window.alert(`Não foi possível gerar o PDF da carta: ${error?.message || 'erro desconhecido'}`);
+      window.alert(`Não foi possível gerar o PDF da carta.\n\nDetalhe: ${error?.message || error || 'erro desconhecido'}\n\nFeche o app por completo, abra de novo e tente outra vez. Se repetir, envie um print desta mensagem.`);
     }
   };
 
@@ -334,7 +349,7 @@ export default function Cartas() {
     const cidadeIgreja = config.cidade && config.estado ? `${config.cidade}/${config.estado}` : '____________________';
 
     return (
-      <div className="bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border flex flex-col">
+      <div className="carta-pagina bg-white w-[210mm] h-[297mm] mx-auto px-[12mm] py-[10mm] shadow-2xl print:shadow-none print:p-[10mm] print:w-[210mm] print:h-[297mm] print:max-w-none box-border flex flex-col">
         <div className="text-center mb-7 pb-4 border-b border-slate-300">
           <ChurchLogo
             alt={`Logo ${config.nome_igreja || 'Igreja'}`}
@@ -427,7 +442,7 @@ export default function Cartas() {
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 0;
+          margin: 10mm;
         }
 
         @media print {
@@ -472,9 +487,15 @@ export default function Cartas() {
             break-inside: avoid;
           }
 
+          .print-area {
+            width: 190mm !important;
+            height: 274mm !important;
+          }
+
           .print-area > div {
-            width: 210mm !important;
-            height: 297mm !important;
+            width: 190mm !important;
+            height: 274mm !important;
+            padding: 0 2mm 6mm !important;
             margin: 0 !important;
           }
         }
