@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { baixarPdf, imprimirElemento, nomeArquivoSeguro } from '@/utils/exportar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext.jsx';
@@ -38,6 +39,7 @@ export default function Cartas() {
   const [modoFormularioImpresso, setModoFormularioImpresso] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [acaoPendente, setAcaoPendente] = useState(null);
+  const [acaoEmAndamento, setAcaoEmAndamento] = useState(null);
   const cartaRef = useRef(null);
   const lastSavedSignatureRef = useRef(null);
   const lastSavedHistoricoIdRef = useRef(null);
@@ -248,146 +250,36 @@ export default function Cartas() {
     }
   };
 
-  const imprimirCarta = () => {
-    window.print();
-  };
+  // Página A4 da carta (filho direto da área de impressão)
+  const paginaCarta = () => cartaRef.current?.firstElementChild || cartaRef.current;
 
-  const renderCartaToCanvas = async (element) => {
-    const styles = Array.from(document.querySelectorAll('style'))
-      .map((style) => style.innerHTML)
-      .join('\n');
+  const nomeArquivoCarta = () =>
+    nomeArquivoSeguro(`carta-${tipoCarta}-${membroSelecionado?.nome_completo || 'membro'}-${format(new Date(), 'yyyy-MM-dd')}`);
 
-    const rect = element.getBoundingClientRect();
-    const scale = 2;
-    const width = Math.max(1, Math.ceil(rect.width * scale));
-    const height = Math.max(1, Math.ceil(rect.height * scale));
-
-    const clone = element.cloneNode(true);
-    clone.querySelectorAll('img').forEach((img) => img.remove());
-
-    const svgMarkup = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-        <foreignObject width="100%" height="100%">
-          <div xmlns="http://www.w3.org/1999/xhtml" style="width:${rect.width}px;height:${rect.height}px;background:#fff;transform:scale(${scale});transform-origin:top left;">
-            <style>${styles}</style>
-            ${clone.outerHTML}
-          </div>
-        </foreignObject>
-      </svg>
-    `;
-
-    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
-    const svgUrl = URL.createObjectURL(svgBlob);
-
+  // Computador: imprime só a carta (iframe). Celular: gera PDF e abre o
+  // compartilhamento do aparelho, de onde dá para imprimir ou salvar.
+  const imprimirCarta = async () => {
+    const pagina = paginaCarta();
+    if (!pagina) return;
     try {
-      const image = await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = svgUrl;
-      });
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d');
-      context.fillStyle = '#ffffff';
-      context.fillRect(0, 0, width, height);
-      context.drawImage(image, 0, 0, width, height);
-      return canvas;
-    } finally {
-      URL.revokeObjectURL(svgUrl);
+      await imprimirElemento(pagina, { titulo: 'Carta', margemMm: 0, nomeArquivo: nomeArquivoCarta() });
+    } catch (error) {
+      console.error('Erro ao imprimir carta:', error);
+      window.alert(`Não foi possível imprimir a carta: ${error?.message || 'erro desconhecido'}`);
     }
-  };
-
-  const buildPdfFromJpegDataUrl = (jpegDataUrl, imageWidth, imageHeight) => {
-    const base64 = jpegDataUrl.split(',')[1];
-    const binary = atob(base64);
-    const imageBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      imageBytes[i] = binary.charCodeAt(i);
-    }
-
-    const encoder = new TextEncoder();
-    const objects = [];
-    const offsets = [0];
-    let length = 0;
-
-    const push = (chunk) => {
-      objects.push(chunk);
-      length += chunk.length;
-    };
-
-    const pushText = (text) => push(encoder.encode(text));
-
-    pushText('%PDF-1.4\n');
-
-    offsets[1] = length;
-    pushText('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
-
-    offsets[2] = length;
-    pushText('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
-
-    offsets[3] = length;
-    pushText('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n');
-
-    offsets[4] = length;
-    pushText(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`);
-    push(imageBytes);
-    pushText('\nendstream\nendobj\n');
-
-    const content = encoder.encode('q\n595.28 0 0 841.89 0 0 cm\n/Im0 Do\nQ\n');
-    offsets[5] = length;
-    pushText(`5 0 obj\n<< /Length ${content.length} >>\nstream\n`);
-    push(content);
-    pushText('endstream\nendobj\n');
-
-    const xrefOffset = length;
-    pushText('xref\n0 6\n0000000000 65535 f \n');
-    for (let i = 1; i <= 5; i += 1) {
-      pushText(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
-    }
-    pushText(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
-
-    return new Blob(objects, { type: 'application/pdf' });
   };
 
   const baixarCartaPdf = async () => {
-    if (!cartaRef.current || !membroSelecionado) {
+    const pagina = paginaCarta();
+    if (!pagina || !membroSelecionado) {
       window.alert('Gere a pré-visualização da carta antes de baixar o PDF.');
       return;
     }
-
-    const nomeBase = `carta-${(membroSelecionado.nome_completo || 'membro').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${Date.now()}`;
-
     try {
-      const canvas = await renderCartaToCanvas(cartaRef.current);
-      const jpegData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdfBlob = buildPdfFromJpegDataUrl(jpegData, canvas.width, canvas.height);
-      const url = URL.createObjectURL(pdfBlob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${nomeBase}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+      await baixarPdf(pagina, nomeArquivoCarta(), { titulo: 'Carta', margemMm: 0 });
     } catch (error) {
       console.error('Erro ao gerar PDF da carta:', error);
-      try {
-        const canvas = await renderCartaToCanvas(cartaRef.current);
-        const pngUrl = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.href = pngUrl;
-        link.download = `${nomeBase}.png`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.alert('O PDF não pôde ser gerado neste navegador. Baixamos a carta em PNG para você salvar no computador.');
-      } catch {
-        window.alert('Não foi possível baixar a carta. Tente novamente.');
-      }
+      window.alert(`Não foi possível gerar o PDF da carta: ${error?.message || 'erro desconhecido'}`);
     }
   };
 
@@ -402,16 +294,26 @@ export default function Cartas() {
       await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
     }
 
-    const saveResult = await salvarCartaNoHistorico();
-    if (!saveResult.saved) return;
+    setAcaoEmAndamento(acao);
+    try {
+      const saveResult = await salvarCartaNoHistorico();
+      if (!saveResult.saved) return;
 
-    if (acao === 'imprimir') {
-      imprimirCarta();
-      return;
-    }
+      if (acao === 'salvar') {
+        window.alert('Carta salva no histórico. Para guardar o arquivo no celular ou computador, toque em "Baixar Carta".');
+        return;
+      }
 
-    if (acao === 'baixar') {
-      await baixarCartaPdf();
+      if (acao === 'imprimir') {
+        await imprimirCarta();
+        return;
+      }
+
+      if (acao === 'baixar') {
+        await baixarCartaPdf();
+      }
+    } finally {
+      setAcaoEmAndamento(null);
     }
   };
 
@@ -808,7 +710,7 @@ export default function Cartas() {
               </Button>
               <Button
                 onClick={() => executarAcaoCarta('salvar')}
-                disabled={saveHistoricoMutation.isPending}
+                disabled={saveHistoricoMutation.isPending || !!acaoEmAndamento}
                 variant="outline"
               >
                 <Save className="w-4 h-4 mr-2" />
@@ -816,23 +718,25 @@ export default function Cartas() {
               </Button>
               <Button
                 onClick={() => executarAcaoCarta('imprimir')}
-                disabled={saveHistoricoMutation.isPending}
+                disabled={saveHistoricoMutation.isPending || !!acaoEmAndamento}
                 variant="outline"
               >
                 <Printer className="w-4 h-4 mr-2" />
-                Imprimir Carta
+                {acaoEmAndamento === 'imprimir' ? 'Preparando...' : 'Imprimir Carta'}
               </Button>
               <Button
                 onClick={() => executarAcaoCarta('baixar')}
-                disabled={saveHistoricoMutation.isPending}
+                disabled={saveHistoricoMutation.isPending || !!acaoEmAndamento}
                 className="bg-gradient-to-r from-blue-500 to-purple-600"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Baixar Carta
+                {acaoEmAndamento === 'baixar' ? 'Gerando PDF...' : 'Baixar Carta'}
               </Button>
             </div>
-            <div className="print-area" ref={cartaRef}>
+            <div className="overflow-x-auto print:overflow-visible -mx-4 px-4 md:mx-0 md:px-0">
+              <div className="print-area w-max mx-auto" ref={cartaRef}>
               <CartaTemplate />
+              </div>
             </div>
           </div>
         )}

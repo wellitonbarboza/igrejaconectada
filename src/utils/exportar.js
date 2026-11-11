@@ -11,7 +11,7 @@
  */
 
 const A4 = { retrato: { w: 210, h: 297 }, paisagem: { w: 297, h: 210 } };
-const MARGEM_MM = 10;
+const MARGEM_PADRAO_MM = 10;
 
 /** Elementos ignorados na exportação. */
 const deveIgnorar = (el) =>
@@ -40,20 +40,33 @@ export const nomeArquivoSeguro = (texto, ext = 'pdf') => {
 /**
  * Salva um Blob: no celular usa o compartilhamento nativo (funciona no app
  * instalado); no computador faz download direto.
+ *
+ * O compartilhamento exige toque recente do usuário. Se a geração demorar e o
+ * navegador bloquear (NotAllowedError), mostramos um aviso com botões para o
+ * usuário tocar de novo — assim funciona em iPhone e Android.
  */
 export async function salvarBlob(blob, nomeArquivo) {
   const file = typeof File !== 'undefined' ? new File([blob], nomeArquivo, { type: blob.type }) : null;
+  const podeCompartilhar = !!(file && navigator.canShare?.({ files: [file] }));
 
-  if (isMobile() && file && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: nomeArquivo });
-      return 'compartilhado';
-    } catch (err) {
-      if (err?.name === 'AbortError') return 'cancelado';
-      // segue para download
+  if (isMobile()) {
+    if (podeCompartilhar) {
+      try {
+        await navigator.share({ files: [file], title: nomeArquivo });
+        return 'compartilhado';
+      } catch (err) {
+        if (err?.name === 'AbortError') return 'cancelado';
+        // NotAllowedError (gesto expirou) ou outro: oferece botão manual
+      }
     }
+    return mostrarAcaoManual(blob, file, nomeArquivo, podeCompartilhar);
   }
 
+  baixarViaLink(blob, nomeArquivo);
+  return 'baixado';
+}
+
+function baixarViaLink(blob, nomeArquivo) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -62,13 +75,59 @@ export async function salvarBlob(blob, nomeArquivo) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 
-  // iOS antigo ignora "download": abre o arquivo em nova aba como último recurso.
-  if (/iphone|ipad|ipod/i.test(navigator.userAgent || '') && !navigator.canShare) {
-    window.open(url, '_blank');
-  }
-  window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-  return 'baixado';
+/** Painel "Arquivo pronto" com botões que o usuário toca (gesto novo). */
+function mostrarAcaoManual(blob, file, nomeArquivo, podeCompartilhar) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const ehPdf = blob.type === 'application/pdf';
+    const fundo = document.createElement('div');
+    fundo.setAttribute('role', 'dialog');
+    fundo.setAttribute('aria-label', 'Arquivo pronto');
+    fundo.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
+    const btn = 'display:block;width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:600;text-align:center;text-decoration:none;border:0;margin-top:10px;cursor:pointer;box-sizing:border-box';
+    fundo.innerHTML = `
+      <div style="background:#fff;border-radius:18px;padding:20px;width:100%;max-width:420px;box-shadow:0 10px 40px rgba(0,0,0,.3)">
+        <p style="margin:0;font-size:17px;font-weight:700;color:#0f172a">Arquivo pronto</p>
+        <p style="margin:6px 0 4px;font-size:14px;color:#475569;word-break:break-all">${nomeArquivo.replace(/</g, '&lt;')}</p>
+        ${podeCompartilhar ? `<button data-acao="share" style="${btn};background:linear-gradient(90deg,#3b82f6,#9333ea);color:#fff">Salvar / Compartilhar / Imprimir</button>` : ''}
+        <a data-acao="abrir" href="${url}" target="_blank" rel="noopener" style="${btn};background:${podeCompartilhar ? '#f1f5f9;color:#0f172a' : 'linear-gradient(90deg,#3b82f6,#9333ea);color:#fff'}">Abrir ${ehPdf ? 'PDF' : 'arquivo'}</a>
+        <a data-acao="baixar" href="${url}" download="${nomeArquivo.replace(/"/g, '')}" style="${btn};background:#f1f5f9;color:#0f172a">Baixar</a>
+        <button data-acao="fechar" style="${btn};background:transparent;color:#64748b">Fechar</button>
+      </div>`;
+
+    const fechar = (resultado) => {
+      fundo.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      resolve(resultado);
+    };
+
+    fundo.addEventListener('click', async (ev) => {
+      const alvo = ev.target.closest('[data-acao]');
+      if (!alvo) {
+        if (ev.target === fundo) fechar('cancelado');
+        return;
+      }
+      const acao = alvo.dataset.acao;
+      if (acao === 'share') {
+        try {
+          await navigator.share({ files: [file], title: nomeArquivo });
+          fechar('compartilhado');
+        } catch (err) {
+          if (err?.name !== 'AbortError') window.alert('Não foi possível compartilhar. Use "Abrir PDF" ou "Baixar".');
+        }
+      } else if (acao === 'abrir' || acao === 'baixar') {
+        window.setTimeout(() => fechar(acao === 'abrir' ? 'aberto' : 'baixado'), 400);
+      } else {
+        fechar('cancelado');
+      }
+    });
+
+    document.body.appendChild(fundo);
+  });
 }
 
 /** Canvas -> Blob PNG e salva. */
@@ -100,7 +159,8 @@ function pontosDeQuebra(raiz) {
  */
 export async function gerarPdf(elemento, opcoes = {}) {
   if (!elemento) throw new Error('Nada para exportar.');
-  const { orientacao = 'retrato', escala = 2, titulo } = opcoes;
+  const { orientacao = 'retrato', escala = 2, titulo, margemMm = MARGEM_PADRAO_MM } = opcoes;
+  const MARGEM_MM = margemMm;
 
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
 
@@ -171,14 +231,16 @@ export async function baixarPdf(elemento, nomeArquivo, opcoes = {}) {
 
 /**
  * Imprime somente o elemento, num iframe com os estilos da página.
- * No app instalado em celular (onde a impressão do navegador falha),
- * gera o PDF e abre o compartilhamento — de lá dá para imprimir.
+ * No celular gera o PDF e abre o compartilhamento — de lá dá para imprimir.
  */
-export async function imprimirElemento(elemento, { titulo = 'Relatório', orientacao = 'retrato', nomeArquivo } = {}) {
+export async function imprimirElemento(elemento, { titulo = 'Relatório', orientacao = 'retrato', nomeArquivo, margemMm } = {}) {
   if (!elemento) throw new Error('Nada para imprimir.');
 
-  if (isMobile() && isAppInstalado()) {
-    return baixarPdf(elemento, nomeArquivo || nomeArquivoSeguro(titulo), { orientacao, titulo });
+  // Celular: impressão do navegador falha no app instalado e, no Android, o
+  // iframe imprime a página inteira. Geramos o PDF e o usuário imprime pelo
+  // visualizador/compartilhamento do aparelho.
+  if (isMobile()) {
+    return baixarPdf(elemento, nomeArquivo || nomeArquivoSeguro(titulo), { orientacao, titulo, margemMm });
   }
 
   const clone = elemento.cloneNode(true);
@@ -206,7 +268,7 @@ export async function imprimirElemento(elemento, { titulo = 'Relatório', orient
   doc.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><base href="${document.baseURI}">
 <title>${String(titulo).replace(/</g, '&lt;')}</title>${estilos}
 <style>
-  @page { size: A4 ${orientacao === 'paisagem' ? 'landscape' : 'portrait'}; margin: 12mm; }
+  @page { size: A4 ${orientacao === 'paisagem' ? 'landscape' : 'portrait'}; margin: ${margemMm ?? 12}mm; }
   html, body { background: #fff !important; margin: 0; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .shadow-lg, .shadow-xl, .shadow-2xl, .shadow-md { box-shadow: none !important; }
